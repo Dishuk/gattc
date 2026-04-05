@@ -368,7 +368,7 @@ def _generate_size_helpers(name: str, payload: Payload) -> str:
         lines.append("")
         lines.append(f"static inline size_t {name}_items_per_mtu(uint16_t mtu)")
         lines.append("{")
-        lines.append(f"    return (mtu - BT_ATT_HEADER_SIZE - {name.upper()}_HEADER_SIZE) / {name.upper()}_ITEM_SIZE;")
+        lines.append(f"    return (mtu - GATTC_ATT_HEADER_SIZE - {name.upper()}_HEADER_SIZE) / {name.upper()}_ITEM_SIZE;")
         lines.append("}")
     else:
         lines.append(f"#define {name.upper()}_SIZE {fixed_size}")
