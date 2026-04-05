@@ -26,9 +26,9 @@ shock_threshold:
 ### 1. Struct (buffer layout)
 
 ```c
-typedef struct __attribute__((packed)) {
+typedef struct {
     uint16_t threshold_mg;  /* unit: milli_g */
-} my_service_shock_threshold_t;
+} __packed my_service_shock_threshold_t;
 ```
 
 ### 2. Compile-time validation
@@ -143,18 +143,18 @@ Generates:
 
 ```c
 // Nested struct for repeated element
-typedef struct __attribute__((packed)) {
+typedef struct {
     int16_t x;
     int16_t y;
     int16_t z;
-} my_service_sensor_data_samples_t;
+} __packed my_service_sensor_data_samples_t;
 
 // Main struct with flexible array
-typedef struct __attribute__((packed)) {
+typedef struct {
     uint8_t packet_count;
     uint32_t timestamp;
     my_service_sensor_data_samples_t samples[];
-} my_service_sensor_data_t;
+} __packed my_service_sensor_data_t;
 
 // Pack/unpack for individual items
 static inline void my_service_sensor_data_pack_item(
@@ -189,8 +189,9 @@ For fields with `bits` defined:
 
 ```c
 /* status_flags bit definitions */
-#define MY_SERVICE_STATUS_FLAGS_ENABLED (1 << 0)
-#define MY_SERVICE_STATUS_FLAGS_ERROR (1 << 1)
+#define MY_SERVICE_STATUS_FLAGS_ENABLED (1 << 0)  /* bit 0 */
+#define MY_SERVICE_STATUS_FLAGS_ERROR (1 << 1)  /* bit 1 */
+/* bits 2-4 (width 3) */
 #define MY_SERVICE_STATUS_FLAGS_MODE_MASK 0x1C
 #define MY_SERVICE_STATUS_FLAGS_MODE_SHIFT 2
 ```
@@ -200,6 +201,32 @@ Usage:
 uint8_t flags = buf.status_flags;
 bool enabled = flags & MY_SERVICE_STATUS_FLAGS_ENABLED;
 uint8_t mode = (flags & MY_SERVICE_STATUS_FLAGS_MODE_MASK) >> MY_SERVICE_STATUS_FLAGS_MODE_SHIFT;
+```
+
+### Write Validation Macros
+
+For each payload, a validation macro is generated to help validate write callback parameters:
+
+```c
+/* Validate write parameters for fixed-size payload */
+#define MY_SERVICE_SHOCK_THRESHOLD_WRITE_VALID(len, offset) \
+    ((offset) == 0 && (len) >= MY_SERVICE_SHOCK_THRESHOLD_SIZE)
+```
+
+Usage in write callback:
+```c
+ssize_t shock_thresh_write_cb(struct bt_conn *conn, const struct bt_gatt_attr *attr,
+                               const void *buf, uint16_t len, uint16_t offset, uint8_t flags)
+{
+    if (!MY_SERVICE_SHOCK_THRESHOLD_WRITE_VALID(len, offset)) {
+        return BT_GATT_ERR(BT_ATT_ERR_INVALID_ATTRIBUTE_LEN);
+    }
+
+    uint16_t value;
+    my_service_shock_threshold_unpack(buf, &value);
+    set_threshold(value);
+    return len;
+}
 ```
 
 ## Notify/Indicate Support
@@ -228,6 +255,30 @@ BT_GATT_CHARACTERISTIC(MY_SERVICE_SENSOR_DATA_UUID,
     my_service_sensor_data_read_cb, NULL, NULL),
 BT_GATT_CCC(my_service_sensor_data_ccc_changed,
     BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
+```
+
+### CCC Permission Inheritance
+
+CCC descriptor permissions are automatically derived from the characteristic's permissions:
+
+| Characteristic Permission | CCC Permissions |
+|--------------------------|-----------------|
+| `read` or `write` | `BT_GATT_PERM_READ \| BT_GATT_PERM_WRITE` |
+| `read_encrypt` or `write_encrypt` | `BT_GATT_PERM_READ_ENCRYPT \| BT_GATT_PERM_WRITE_ENCRYPT` |
+| `read_authen` or `write_authen` | `BT_GATT_PERM_READ_AUTHEN \| BT_GATT_PERM_WRITE_AUTHEN` |
+
+Example with authentication:
+
+```yaml
+secure_sensor:
+  properties: [read, notify]
+  permissions: [read_authen]
+```
+
+Generates:
+```c
+BT_GATT_CCC(my_service_secure_sensor_ccc_changed,
+    BT_GATT_PERM_READ_AUTHEN | BT_GATT_PERM_WRITE_AUTHEN),
 ```
 
 **In `.h` file:**

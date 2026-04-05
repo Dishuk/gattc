@@ -74,10 +74,10 @@ Generates `temperature_service.h` and `temperature_service.c`.
 ### Generated Structs
 
 ```c
-typedef struct __attribute__((packed)) {
+typedef struct {
     int16_t value;
     uint8_t flags;
-} temperature_service_temperature_t;
+} __packed temperature_service_temperature_t;
 ```
 
 ### Bitfield Macros
