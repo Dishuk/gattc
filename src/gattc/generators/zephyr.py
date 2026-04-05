@@ -159,7 +159,7 @@ def _is_fixed_array(field: Field) -> bool:
 def _generate_struct(name: str, fields: List[Field], indent: str = "") -> str:
     """Generate a packed struct definition."""
     lines = []
-    lines.append(f"{indent}typedef struct __attribute__((packed)) {{")
+    lines.append(f"{indent}typedef struct {{")
 
     for field in fields:
         c_type = _get_c_type(field.type_info)
@@ -181,7 +181,7 @@ def _generate_struct(name: str, fields: List[Field], indent: str = "") -> str:
                 comment = f"  /* unit: {field.unit} */"
             lines.append(f"{indent}    {c_type} {field.name};{comment}")
 
-    lines.append(f"{indent}}} {name}_t;")
+    lines.append(f"{indent}}} __packed {name}_t;")
     return "\n".join(lines)
 
 
