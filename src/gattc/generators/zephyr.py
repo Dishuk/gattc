@@ -92,6 +92,21 @@ def _needs_ccc(char: Characteristic) -> bool:
     return "notify" in char.properties or "indicate" in char.properties
 
 
+def _format_ccc_permissions(perms: List[str]) -> str:
+    """Derive CCC permissions from characteristic permissions.
+
+    CCC always needs read and write. Security level is inherited from
+    the characteristic's write permission (or read if no write).
+    """
+    # Determine security level from characteristic permissions
+    if "write_authen" in perms or "read_authen" in perms:
+        return "BT_GATT_PERM_READ_AUTHEN | BT_GATT_PERM_WRITE_AUTHEN"
+    elif "write_encrypt" in perms or "read_encrypt" in perms:
+        return "BT_GATT_PERM_READ_ENCRYPT | BT_GATT_PERM_WRITE_ENCRYPT"
+    else:
+        return "BT_GATT_PERM_READ | BT_GATT_PERM_WRITE"
+
+
 def _read_cb_name(service_name: str, char: Characteristic) -> str:
     """Generate read callback name from service and characteristic name."""
     return f"{service_name}_{char.name}_read_cb"
@@ -526,6 +541,7 @@ def _build_source_context(schema: Schema, header_name: str) -> dict:
             "write_cb": write_cb,
             "needs_ccc": _needs_ccc(char),
             "ccc_cb": ccc_cb,
+            "ccc_perms": _format_ccc_permissions(char.permissions) if _needs_ccc(char) else None,
         })
 
     return {

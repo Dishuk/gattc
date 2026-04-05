@@ -19,7 +19,7 @@ BT_GATT_SERVICE_DEFINE({{ svc.service_name }}_svc,
         {{ char.read_cb }}, {{ char.write_cb }}, NULL),
 {%- if char.needs_ccc %}
     BT_GATT_CCC({{ char.ccc_cb }},
-        BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
+        {{ char.ccc_perms }}),
 {%- endif %}
 {%- endfor %}
 );
