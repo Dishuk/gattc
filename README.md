@@ -10,8 +10,6 @@ A contract-first tool for BLE development. Define your GATT services once in YAM
 | pip | any | Package installation |
 | [Zephyr RTOS](https://zephyrproject.org/) | >= 3.5.0 | Target platform for generated C code |
 
-> **Note:** Generated code targets Zephyr 3.5.0+. A compile-time warning is emitted if an older version is detected.
-
 ## Features
 
 - **Contract-first** — Single YAML schema as source of truth

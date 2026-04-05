@@ -3,7 +3,7 @@
 ## Prerequisites
 
 - Python >= 3.9
-- Zephyr RTOS >= 3.5.0 (target platform)
+- Zephyr RTOS >= 3.5.0
 
 ## Installation
 

@@ -6,15 +6,9 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <string.h>
-#include <zephyr/version.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/bluetooth/uuid.h>
-
-/* Minimum supported Zephyr version: 3.5.0 */
-#if !defined(KERNEL_VERSION_NUMBER) || KERNEL_VERSION_NUMBER < 0x30500
-#warning "gattc: Generated code is tested with Zephyr 3.5.0+. Older versions may have compatibility issues."
-#endif
 
 /*============================ Constants ============================*/
 
