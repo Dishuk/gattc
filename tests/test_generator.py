@@ -44,7 +44,7 @@ characteristics:
         # Check header contains expected elements
         assert "TEST_SERVICE_UUID_VAL" in header
         assert "TEST_SERVICE_TEMPERATURE_UUID_VAL" in header
-        assert "typedef struct __attribute__((packed))" in header
+        assert "} __packed test_service_temperature_t;" in header
         assert "test_service_temperature_t" in header
         assert "int16_t value;" in header
         assert "_Static_assert" in header
