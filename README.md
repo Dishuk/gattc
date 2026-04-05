@@ -1,33 +1,31 @@
 # gattc - GATT Compiler
 
-A contract-first tool for BLE development. Define your GATT services once in YAML, generate type-safe code for firmware, and eliminate drift between teams.
+A contract-first tool for BLE development. Define your GATT services once in YAML, generate type-safe code for firmware.
 
-## The Problem
+## Prerequisites
 
-BLE development across firmware and mobile is fragmented:
+| Tool | Version | Purpose |
+|------|---------|---------|
+| [Python](https://www.python.org/) | >= 3.9 | Runtime |
+| pip | any | Package installation |
 
-- **Scattered definitions**: UUIDs in `.h` files, byte layout implicit in code, docs separate
-- **Silent drift**: Firmware changes payload structure, mobile breaks at runtime
-- **Manual sync**: Mobile devs read ICDs and manually implement characteristics
+## Features
 
-## The Solution
-
-`gattc` generates from a single YAML schema:
-
-- **C headers** for Zephyr (UUIDs, packed structs, pack/unpack functions)
-
-> **Note:** Additional generators (TypeScript, Swift, Markdown docs) are nice-to-have features for future consideration, not requirements. The primary focus is Zephyr code generation.
+- **Contract-first** — Single YAML schema as source of truth
+- **Type-safe C code** — Packed structs with compile-time size validation
+- **Endian-correct** — Automatic byte order handling for BLE
+- **Drift detection** — Schema changes break compilation, not runtime
 
 ## Quick Start
 
 ```bash
 # Install
-pip install gattc
+pip install git+https://github.com/polesskiy-dev/gattc.git
 
-# Initialize new project
+# Initialize new project (creates boilerplate echo_service.yaml)
 gattc init
 
-# Edit gatt/echo_service.yaml, then compile
+# Edit the generated schema, then compile
 gattc compile
 
 # Or compile a single schema directly
@@ -59,15 +57,31 @@ characteristics:
           1: overflow
 ```
 
+## Project Structure
+
+```
+gattc/
+├── src/gattc/
+│   ├── cli.py              # CLI entry point
+│   ├── schema.py           # YAML parsing and validation
+│   ├── config.py           # Project configuration
+│   └── generators/
+│       ├── zephyr.py       # C code generator
+│       └── docs.py         # HTML documentation generator
+├── tests/
+└── docs/
+```
+
 ## Documentation
 
-See [docs/](docs/) for detailed documentation:
-
-- [Schema Specification](docs/schema.md) - YAML format, data types
-- [Architecture](docs/architecture.md) - System design
-- [Code Generation](docs/codegen.md) - What gets generated
-- [CLI Reference](docs/cli.md) - Command-line usage
-- [Development](docs/development.md) - Build, test, contribute
+| Document | Description |
+|----------|-------------|
+| [Schema Specification](docs/schema.md) | YAML schema format, data types, field syntax |
+| [Architecture](docs/architecture.md) | System design, components, data flow |
+| [Code Generation](docs/codegen.md) | What gets generated, philosophy, resource considerations |
+| [Documentation Generation](docs/docgen.md) | HTML documentation output |
+| [CLI Reference](docs/cli.md) | Command-line usage and options |
+| [Development](docs/development.md) | Build commands, testing, contributing |
 
 ## License
 

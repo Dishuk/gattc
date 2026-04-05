@@ -129,7 +129,7 @@ payload:
   field_name:
     type: uint16
     unit: celsius
-    range: [0, 100]
+    values: [0, 100]
     description: "Temperature value"
 
   # Explicit offset (for gaps/reserved space)
@@ -176,9 +176,41 @@ payload:
 | `type` | Data type (required if expanded syntax) |
 | `offset` | Byte offset, auto-computed if omitted |
 | `unit` | Unit hint for documentation |
-| `range` | Valid value range `[min, max]` |
+| `values` | Valid values (see below) |
 | `description` | Human-readable description |
 | `bits` | Bitfield definition |
+
+### Values
+
+The `values` field supports three formats:
+
+**Range** - valid numeric range:
+
+```yaml
+temperature:
+  type: int16
+  values: [-4000, 8500]    # min, max
+```
+
+**Named values** - enumeration mapping:
+
+```yaml
+status:
+  type: uint8
+  values:
+    0: "success"
+    1: "error"
+    2: "pending"
+    0xff: "unknown"
+```
+
+**Text description** - free-form:
+
+```yaml
+device_id:
+  type: bytes[6]
+  values: "MAC address in little-endian"
+```
 
 ### Units
 
