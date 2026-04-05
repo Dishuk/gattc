@@ -407,11 +407,12 @@ def _generate_bitfield_macros(name: str, field: Field) -> str:
             start, end = map(int, bit_spec_str.split("-"))
             width = end - start + 1
             mask = ((1 << width) - 1) << start
+            lines.append(f"/* bits {start}-{end} (width {width}) */")
             lines.append(f"#define {name.upper()}_{field.name.upper()}_{bit_name.upper()}_MASK 0x{mask:02X}")
             lines.append(f"#define {name.upper()}_{field.name.upper()}_{bit_name.upper()}_SHIFT {start}")
         else:
             bit = int(bit_spec_str)
-            lines.append(f"#define {name.upper()}_{field.name.upper()}_{bit_name.upper()} (1 << {bit})")
+            lines.append(f"#define {name.upper()}_{field.name.upper()}_{bit_name.upper()} (1 << {bit})  /* bit {bit} */")
 
     return "\n".join(lines)
 
