@@ -385,10 +385,18 @@ def _generate_size_helpers(name: str, payload: Payload) -> str:
         lines.append("{")
         lines.append(f"    return (mtu - GATTC_ATT_HEADER_SIZE - {name.upper()}_HEADER_SIZE) / {name.upper()}_ITEM_SIZE;")
         lines.append("}")
+        lines.append("")
+        lines.append("/* Validate write parameters (header only, variable payload) */")
+        lines.append(f"#define {name.upper()}_WRITE_VALID(len, offset) \\")
+        lines.append(f"    ((offset) == 0 && (len) >= {name.upper()}_HEADER_SIZE)")
     else:
         lines.append(f"#define {name.upper()}_SIZE {fixed_size}")
         lines.append("")
         lines.append(f"_Static_assert(sizeof({name}_t) == {name.upper()}_SIZE, \"{name} size mismatch\");")
+        lines.append("")
+        lines.append("/* Validate write parameters for fixed-size payload */")
+        lines.append(f"#define {name.upper()}_WRITE_VALID(len, offset) \\")
+        lines.append(f"    ((offset) == 0 && (len) >= {name.upper()}_SIZE)")
 
     return "\n".join(lines)
 
