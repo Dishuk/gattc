@@ -222,15 +222,16 @@
         .characteristic-header .description { color: var(--text-secondary); margin: 0; }
         .version-info { font-size: 0.9em; color: var(--text-secondary); }
 
-        .changelog { background: var(--bg-light); border: 1px solid var(--border-color); border-radius: 8px; padding: 1.5rem; margin-bottom: 3rem; }
+        .changelog { background: var(--bg-light); border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem 1.5rem; margin-bottom: 3rem; }
         .changelog-table { width: 100%; border-collapse: collapse; font-size: 0.85em; }
-        .changelog-table th { background: var(--bg-code); text-align: left; padding: 0.5rem 0.75rem; font-weight: 600; color: var(--text-secondary); border-bottom: 2px solid var(--border-color); }
-        .changelog-table td { padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border-color); vertical-align: top; }
+        .changelog-table th { background: var(--bg-code); text-align: left; padding: 0.4rem 0.75rem; font-weight: 600; color: var(--text-secondary); border-bottom: 2px solid var(--border-color); }
+        .changelog-table td { padding: 0.35rem 0.75rem; border-bottom: 1px solid var(--border-color); vertical-align: top; }
         .changelog-table tr:hover { background: none; }
         .changelog-table .col-revision { width: 8%; white-space: nowrap; text-align: center; }
         .changelog-table .col-date { width: 15%; white-space: nowrap; color: var(--text-secondary); }
         .changelog-table .col-changes { width: 75%; }
-        .changelog-changes { font-family: 'Consolas', 'Monaco', monospace; font-size: 0.95em; white-space: pre-wrap; }
+        .changelog-changes { font-family: 'Consolas', 'Monaco', monospace; font-size: 0.9em; line-height: 1.4; margin: 0; padding: 0; }
+        .changelog-changes span { display: block; white-space: pre; margin: 0; padding: 0; }
         .changelog-changes .added { color: #16a34a; }
         .changelog-changes .removed { color: #dc2626; }
         .changelog-changes .modified { color: #d97706; }
@@ -402,10 +403,8 @@
 {%- for entry in svc.changelog %}
                         <tr>
                             <td class="col-revision">{{ entry.revision }}</td>
-                            <td class="col-date">{{ entry.timestamp }}</td>
-                            <td class="col-changes">
-                                <div class="changelog-changes">
-{%- if entry.changes is defined %}
+                            <td class="col-date">{{ entry.timestamp[:16] }}</td>
+                            <td class="col-changes"><div class="changelog-changes">{%- if entry.changes is defined %}
 {#- Old format: pre-formatted strings -#}
 {%- for change in entry.changes %}
 {%- set trimmed = change.strip() %}
@@ -424,44 +423,33 @@
 Schema revision: {{ entry.schema_revision.old|default('none') }} -> {{ entry.schema_revision.new|default('none') }}
 {% endif %}
 {%- for name in entry.characteristics.added|default([]) %}
-<span class="added">+ Added characteristic: {{ name }}</span>
+<span class="added">Characteristic added: {{ name }}</span>
 {% endfor %}
 {%- for name in entry.characteristics.removed|default([]) %}
-<span class="removed">- Removed characteristic: {{ name }}</span>
+<span class="removed">Characteristic removed: {{ name }}</span>
 {% endfor %}
 {%- for name, mods in (entry.characteristics.modified|default({}))|dictsort %}
-<span class="modified">  Modified: {{ name }}</span>
+<span>  Characteristic: {{ name }}</span>
 {%- if mods.uuid is defined %}
-    UUID: {{ mods.uuid.old }} -> {{ mods.uuid.new }}
-{%- endif %}
+<span class="modified">    UUID changed: {{ mods.uuid.old }} -> {{ mods.uuid.new }}</span>{% endif -%}
 {%- if mods.description_changed %}
-    Description changed
-{%- endif %}
+<span class="modified">    Description changed</span>{% endif -%}
 {%- if mods.payload_config_changed %}
-    Payload config changed
-{%- endif %}
+<span class="modified">    Payload config changed</span>{% endif -%}
 {%- for prop in mods.properties_added|default([]) %}
-<span class="added">    + Property: {{ prop }}</span>
-{%- endfor %}
+<span class="added">    Property added: {{ prop }}</span>{% endfor -%}
 {%- for prop in mods.properties_removed|default([]) %}
-<span class="removed">    - Property: {{ prop }}</span>
-{%- endfor %}
+<span class="removed">    Property removed: {{ prop }}</span>{% endfor -%}
 {%- for fld in mods.fields_added|default([]) %}
-<span class="added">    + {{ fld.name }}{% if fld.type %} ({{ fld.type }}){% endif %}</span>
-{%- endfor %}
+<span class="added">    Field added: {{ fld.name }}{% if fld.type %} ({{ fld.type }}){% endif %}</span>{% endfor -%}
 {%- for fld in mods.fields_removed|default([]) %}
-<span class="removed">    - {{ fld }}</span>
-{%- endfor %}
+<span class="removed">    Field removed: {{ fld }}</span>{% endfor -%}
 {%- for fld in mods.fields_modified|default([]) %}
-<span class="modified">    ~ {{ fld.name }}{% if fld.detail %}: {{ fld.detail }}{% endif %}</span>
-{%- endfor %}
+<span class="modified">    Field changed: {{ fld.name }}{% if fld.detail %} ({{ fld.detail }}){% endif %}</span>{% endfor -%}
 {%- if mods.offsets_changed %}
-    Payload offsets changed
-{%- endif %}
-{% endfor %}
-{%- endif %}
-                                </div>
-                            </td>
+<span class="modified">    Payload offsets changed</span>{% endif -%}
+{%- endfor -%}
+{%- endif -%}</div></td>
                         </tr>
 {%- endfor %}
                     </tbody>

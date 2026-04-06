@@ -106,7 +106,7 @@ def add_changelog_entry(
 
     # Build structured entry
     new_entry: Dict[str, Any] = {
-        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
         "revision": next_revision,
     }
 
