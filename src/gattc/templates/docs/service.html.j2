@@ -26,6 +26,21 @@
 {%- else -%}-{%- endif -%}
 {%- endmacro -%}
 
+{#- Macro for determining row class based on change status -#}
+{%- macro row_change_class(field) -%}
+{%- if field.change_status == 'added' -%}row-added
+{%- elif field.change_status == 'modified' -%}row-modified
+{%- elif field.change_status == 'removed' -%}row-removed
+{%- endif -%}
+{%- endmacro -%}
+
+{#- Macro for field change badge -#}
+{%- macro field_change_badge(field) -%}
+{%- if field.change_status == 'added' -%}<span class="badge badge-new" style="font-size: 0.65em; margin-left: 0.3rem;">NEW</span>
+{%- elif field.change_status == 'modified' -%}<span class="badge badge-changed" style="font-size: 0.65em; margin-left: 0.3rem;">CHANGED</span>
+{%- endif -%}
+{%- endmacro -%}
+
 {#- Macro for rendering a payload table -#}
 {%- macro render_payload(payload, title) -%}
 {%- if payload and payload.fields %}
@@ -42,8 +57,8 @@
                                 <th>Units</th>
                             </tr>
 {%- for field in payload.fields %}
-                            <tr>
-                                <td class="field-name">{{ field.name }}</td>
+                            <tr class="{{ row_change_class(field) }}">
+                                <td class="field-name">{{ field.name }}{{ field_change_badge(field) }}</td>
                                 <td class="field-offset">{{ field.offset }}</td>
                                 <td class="field-length">{{ field.length }}</td>
                                 <td class="field-type">{{ field.type }}</td>
@@ -169,11 +184,13 @@
 
         .content { margin-left: var(--nav-width); flex: 1; padding: 2rem 3rem; }
 
-        h1 { color: var(--primary-color); border-bottom: 3px solid var(--primary-color); padding-bottom: 0.5rem; margin-bottom: 1rem; }
-        h2 { color: var(--text-primary); margin-top: 2.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; }
+        h1 { color: var(--primary-color); border-bottom: 3px solid var(--primary-color); padding-bottom: 0.5rem; margin-bottom: 2rem; }
+        h2 { color: var(--text-primary); margin-top: 3rem; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; }
+        h2:first-of-type { margin-top: 0; }
+        .service-name { color: var(--primary-color); }
         h3 { color: var(--primary-color); margin-top: 2rem; margin-bottom: 0.5rem; }
 
-        .service-info { background: var(--bg-light); border: 1px solid var(--border-color); border-radius: 8px; padding: 1.5rem; margin-bottom: 2rem; }
+        .service-info { background: var(--bg-light); border: 1px solid var(--border-color); border-radius: 8px; margin-bottom: 3rem; padding: 1.5rem; display: flex; flex-direction: column; gap: 0.5rem; }
         .service-info p { margin: 0.5rem 0; }
         .uuid { font-family: 'Consolas', 'Monaco', monospace; background: var(--bg-code); padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.9em; }
 
@@ -190,7 +207,37 @@
         .badge-write { background: var(--badge-write-bg); color: var(--badge-write-text); }
         .badge-notify { background: var(--badge-notify-bg); color: var(--badge-notify-text); }
         .badge-other { background: var(--badge-other-bg); color: var(--badge-other-text); }
+        .badge-new { background: #22c55e; color: white; font-size: 0.7em; padding: 2px 6px; margin-left: 0.5rem; }
+        .badge-changed { background: #f59e0b; color: white; font-size: 0.7em; padding: 2px 6px; margin-left: 0.5rem; }
+        .badge-removed { background: #ef4444; color: white; font-size: 0.7em; padding: 2px 6px; margin-left: 0.5rem; text-decoration: line-through; }
+        .row-added { background: rgba(34, 197, 94, 0.1) !important; }
+        .row-modified { background: rgba(245, 158, 11, 0.1) !important; }
+        .row-removed { background: rgba(239, 68, 68, 0.1) !important; text-decoration: line-through; }
+        [data-theme="dark"] .badge-new { background: #16a34a; }
+        [data-theme="dark"] .badge-changed { background: #d97706; }
+        [data-theme="dark"] .badge-removed { background: #dc2626; }
+        [data-theme="dark"] .row-added { background: rgba(34, 197, 94, 0.15) !important; }
+        [data-theme="dark"] .row-modified { background: rgba(245, 158, 11, 0.15) !important; }
+        [data-theme="dark"] .row-removed { background: rgba(239, 68, 68, 0.15) !important; }
         .characteristic-header .description { color: var(--text-secondary); margin: 0; }
+        .version-info { font-size: 0.9em; color: var(--text-secondary); }
+
+        .changelog { background: var(--bg-light); border: 1px solid var(--border-color); border-radius: 8px; padding: 1.5rem; margin-bottom: 3rem; }
+        .changelog-table { width: 100%; border-collapse: collapse; font-size: 0.85em; }
+        .changelog-table th { background: var(--bg-code); text-align: left; padding: 0.5rem 0.75rem; font-weight: 600; color: var(--text-secondary); border-bottom: 2px solid var(--border-color); }
+        .changelog-table td { padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border-color); vertical-align: top; }
+        .changelog-table tr:hover { background: none; }
+        .changelog-table .col-revision { width: 8%; white-space: nowrap; text-align: center; }
+        .changelog-table .col-date { width: 15%; white-space: nowrap; color: var(--text-secondary); }
+        .changelog-table .col-changes { width: 75%; }
+        .changelog-changes { font-family: 'Consolas', 'Monaco', monospace; font-size: 0.95em; white-space: pre-wrap; }
+        .changelog-changes .added { color: #16a34a; }
+        .changelog-changes .removed { color: #dc2626; }
+        .changelog-changes .modified { color: #d97706; }
+        [data-theme="dark"] .changelog-changes .added { color: #4ade80; }
+        [data-theme="dark"] .changelog-changes .removed { color: #f87171; }
+        [data-theme="dark"] .changelog-changes .modified { color: #fbbf24; }
+        .changelog-empty { color: var(--text-secondary); font-style: italic; text-align: center; padding: 1rem; }
 
         table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.9em; table-layout: fixed; }
         th, td { padding: 0.4rem 0.5rem; text-align: left; vertical-align: top; border-bottom: 1px solid var(--border-color); word-wrap: break-word; }
@@ -262,6 +309,7 @@
         .nav-link { display: block; padding: 0.3rem 1rem 0.3rem 2rem; color: var(--text-secondary); text-decoration: none; font-size: 0.8em; border-left: 3px solid transparent; transition: all 0.15s ease; }
         .nav-link.service-link { padding-left: 1rem; font-weight: 500; color: var(--text-primary); }
         .service-section { margin-bottom: 4rem; scroll-margin-top: 1rem; }
+        .service-section + .service-section { margin-top: 5rem; }
 {% else %}
         .nav-title { font-size: 0.75em; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; padding: 0.5rem 1rem; margin: 0; }
         .nav-link { display: block; padding: 0.4rem 1rem; color: var(--text-secondary); text-decoration: none; font-size: 0.85em; border-left: 3px solid transparent; transition: all 0.15s ease; }
@@ -283,9 +331,12 @@
             <div class="nav-section">
                 <h4 class="nav-service-title" data-service="{{ svc.service.name }}">
                     <span class="arrow">&#9660;</span>
-                    <a href="#{{ svc.service.name }}" class="nav-link service-link">{{ svc.service.name }}</a>
+                    <a href="#{{ svc.service.name }}-service-info" class="nav-link service-link">{{ svc.service.name }}</a>
                 </h4>
                 <ul class="nav-list" id="nav-{{ svc.service.name }}">
+{%- if svc.changelog %}
+                    <li class="nav-item"><a href="#{{ svc.service.name }}-changelog" class="nav-link">Changelog</a></li>
+{%- endif %}
 {%- for char in svc.characteristics %}
                     <li class="nav-item"><a href="#{{ svc.service.name }}-{{ char.name }}" class="nav-link">{{ char.name }}</a></li>
 {%- endfor %}
@@ -293,6 +344,16 @@
             </div>
 {%- endfor %}
 {%- else %}
+            <h4 class="nav-title">Service</h4>
+            <ul class="nav-list">
+                <li class="nav-item"><a href="#service-info" class="nav-link">{{ services[0].service.name }}</a></li>
+            </ul>
+{%- if services[0].changelog %}
+            <h4 class="nav-title">Changelog</h4>
+            <ul class="nav-list">
+                <li class="nav-item"><a href="#changelog" class="nav-link">View Changes</a></li>
+            </ul>
+{%- endif %}
             <h4 class="nav-title">Characteristics</h4>
             <ul class="nav-list">
 {%- for char in services[0].characteristics %}
@@ -303,27 +364,120 @@
         </nav>
 
         <main class="content">
-            <h1>{{ title }}</h1>
 {%- for svc in services %}
 {%- if is_combined %}
-
             <section class="service-section" id="{{ svc.service.name }}">
-                <h2>{{ svc.service.name }}</h2>
 {%- endif %}
 
+            <h2 id="{% if is_combined %}{{ svc.service.name }}-{% endif %}service-info">Service: <span class="service-name">{{ svc.service.name }}</span></h2>
             <div class="service-info">
-                <p><strong>UUID:</strong> <span class="uuid">{{ svc.service.uuid }}</span></p>
+                <div class="meta-item">
+                    <span class="meta-label">UUID:</span>
+                    <span class="uuid">{{ svc.service.uuid }}</span>
+                </div>
+{%- if svc.service.schema_version or svc.service.schema_revision %}
+                <div class="meta-item">
+                    <span class="meta-label">Version:</span>
+                    <span>{{ svc.service.schema_version or "1.0" }}{% if svc.service.schema_revision %} (Rev {{ svc.service.schema_revision }}){% endif %}</span>
+                </div>
+{%- endif %}
 {%- if svc.service.description %}
                 <p class="description">{{ svc.service.description }}</p>
 {%- endif %}
             </div>
 
-            <h{% if is_combined %}3{% else %}2{% endif %}>Characteristics</h{% if is_combined %}3{% else %}2{% endif %}>
+{%- if svc.changelog %}
+            <h2 id="{% if is_combined %}{{ svc.service.name }}-{% endif %}changelog">Changelog</h2>
+            <div class="changelog">
+{%- if svc.changelog|length > 0 %}
+                <table class="changelog-table">
+                    <thead>
+                        <tr>
+                            <th class="col-revision">Rev</th>
+                            <th class="col-date">Date</th>
+                            <th class="col-changes">Changes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+{%- for entry in svc.changelog %}
+                        <tr>
+                            <td class="col-revision">{{ entry.revision }}</td>
+                            <td class="col-date">{{ entry.timestamp }}</td>
+                            <td class="col-changes">
+                                <div class="changelog-changes">
+{%- if entry.changes is defined %}
+{#- Old format: pre-formatted strings -#}
+{%- for change in entry.changes %}
+{%- set trimmed = change.strip() %}
+{%- if trimmed.startswith('+') %}<span class="added">{{ change }}</span>
+{% elif trimmed.startswith('-') %}<span class="removed">{{ change }}</span>
+{% elif trimmed.startswith('~') %}<span class="modified">{{ change|replace('~ ', '  ', 1) }}</span>
+{% else %}{{ change }}
+{% endif %}
+{%- endfor %}
+{%- else %}
+{#- New format: structured data -#}
+{%- for change in entry.service_changes|default([]) %}
+{{ change }}
+{% endfor %}
+{%- if entry.schema_revision is defined %}
+Schema revision: {{ entry.schema_revision.old|default('none') }} -> {{ entry.schema_revision.new|default('none') }}
+{% endif %}
+{%- for name in entry.characteristics.added|default([]) %}
+<span class="added">+ Added characteristic: {{ name }}</span>
+{% endfor %}
+{%- for name in entry.characteristics.removed|default([]) %}
+<span class="removed">- Removed characteristic: {{ name }}</span>
+{% endfor %}
+{%- for name, mods in (entry.characteristics.modified|default({}))|dictsort %}
+<span class="modified">  Modified: {{ name }}</span>
+{%- if mods.uuid is defined %}
+    UUID: {{ mods.uuid.old }} -> {{ mods.uuid.new }}
+{%- endif %}
+{%- if mods.description_changed %}
+    Description changed
+{%- endif %}
+{%- if mods.payload_config_changed %}
+    Payload config changed
+{%- endif %}
+{%- for prop in mods.properties_added|default([]) %}
+<span class="added">    + Property: {{ prop }}</span>
+{%- endfor %}
+{%- for prop in mods.properties_removed|default([]) %}
+<span class="removed">    - Property: {{ prop }}</span>
+{%- endfor %}
+{%- for fld in mods.fields_added|default([]) %}
+<span class="added">    + {{ fld.name }}{% if fld.type %} ({{ fld.type }}){% endif %}</span>
+{%- endfor %}
+{%- for fld in mods.fields_removed|default([]) %}
+<span class="removed">    - {{ fld }}</span>
+{%- endfor %}
+{%- for fld in mods.fields_modified|default([]) %}
+<span class="modified">    ~ {{ fld.name }}{% if fld.detail %}: {{ fld.detail }}{% endif %}</span>
+{%- endfor %}
+{%- if mods.offsets_changed %}
+    Payload offsets changed
+{%- endif %}
+{% endfor %}
+{%- endif %}
+                                </div>
+                            </td>
+                        </tr>
+{%- endfor %}
+                    </tbody>
+                </table>
+{%- else %}
+                <p class="changelog-empty">No changes recorded yet.</p>
+{%- endif %}
+            </div>
+{%- endif %}
+
+            <h2>Characteristics</h2>
 {%- for char in svc.characteristics %}
 
             <div class="characteristic" id="{% if is_combined %}{{ svc.service.name }}-{% endif %}{{ char.name }}">
                 <div class="characteristic-header">
-                    <h3>{{ char.name }}</h3>
+                    <h3>{{ char.name }}{% if char.change_status == 'added' %}<span class="badge badge-new">NEW</span>{% elif char.change_status == 'modified' %}<span class="badge badge-changed">CHANGED</span>{% elif char.change_status == 'removed' %}<span class="badge badge-removed">REMOVED</span>{% endif %}</h3>
                     <div class="characteristic-meta">
                         <div class="meta-item">
                             <span class="meta-label">UUID:</span>
@@ -382,29 +536,46 @@
                 });
             });
             const navLinks = document.querySelectorAll('.nav-link:not(.service-link)');
-            const serviceLinks = document.querySelectorAll('.nav-link.service-link');
-            const chars = document.querySelectorAll('.characteristic');
-            const sections = document.querySelectorAll('.service-section');
+            // Collect all nav targets (changelogs + characteristics) and sort by position
+            const allTargets = [
+                ...document.querySelectorAll('h2[id$="-changelog"]'),
+                ...document.querySelectorAll('.characteristic')
+            ].sort((a, b) => a.offsetTop - b.offsetTop);
             function updateActiveLink() {
                 const scrollPos = window.scrollY + 100;
-                let currentChar = '', currentService = '';
-                chars.forEach(c => { if (scrollPos >= c.offsetTop && scrollPos < c.offsetTop + c.offsetHeight) currentChar = c.id; });
-                sections.forEach(s => { if (scrollPos >= s.offsetTop && scrollPos < s.offsetTop + s.offsetHeight) currentService = s.id; });
+                let currentItem = '';
+                // Check all targets (changelogs and characteristics) sorted by position
+                allTargets.forEach(t => { if (scrollPos >= t.offsetTop) currentItem = t.id; });
+                // Handle bottom of page
                 if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 50) {
-                    if (chars.length) currentChar = chars[chars.length - 1].id;
-                    if (sections.length) currentService = sections[sections.length - 1].id;
+                    if (allTargets.length) currentItem = allTargets[allTargets.length - 1].id;
                 }
-                navLinks.forEach(l => l.classList.toggle('active', l.getAttribute('href') === '#' + currentChar));
-                serviceLinks.forEach(l => l.classList.toggle('active', l.getAttribute('href') === '#' + currentService));
+                navLinks.forEach(l => l.classList.toggle('active', l.getAttribute('href') === '#' + currentItem));
             }
 {% else %}
             const navLinks = document.querySelectorAll('.nav-link');
-            const sections = document.querySelectorAll('.characteristic');
+            const serviceHeader = document.getElementById('service-info');
+            const changelogHeader = document.getElementById('changelog');
+            const chars = document.querySelectorAll('.characteristic');
             function updateActiveLink() {
                 const scrollPos = window.scrollY + 100;
                 let current = '';
-                sections.forEach(s => { if (scrollPos >= s.offsetTop && scrollPos < s.offsetTop + s.offsetHeight) current = s.id; });
-                if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 50) current = sections[sections.length - 1].id;
+                // Check service section
+                if (serviceHeader && scrollPos >= serviceHeader.offsetTop) {
+                    current = 'service-info';
+                }
+                // Check changelog section
+                if (changelogHeader && scrollPos >= changelogHeader.offsetTop) {
+                    current = 'changelog';
+                }
+                // Check characteristics
+                chars.forEach(c => {
+                    if (scrollPos >= c.offsetTop) current = c.id;
+                });
+                // Handle bottom of page
+                if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 50) {
+                    if (chars.length) current = chars[chars.length - 1].id;
+                }
                 navLinks.forEach(l => l.classList.toggle('active', l.getAttribute('href') === '#' + current));
             }
 {% endif %}

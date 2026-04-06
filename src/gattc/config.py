@@ -44,6 +44,12 @@ class DocsOutputConfig:
 
 
 @dataclass
+class SnapshotsConfig:
+    """Snapshots configuration for change tracking."""
+    path: Optional[Path] = None  # Path to snapshots directory
+
+
+@dataclass
 class OutputConfig:
     zephyr: ZephyrOutputConfig = field(default_factory=ZephyrOutputConfig)
     docs: DocsOutputConfig = field(default_factory=DocsOutputConfig)
@@ -60,6 +66,7 @@ class Config:
     schemas: List[Path] = field(default_factory=list)
     output: OutputConfig = field(default_factory=OutputConfig)
     services: Dict[str, ServiceConfig] = field(default_factory=dict)
+    snapshots: SnapshotsConfig = field(default_factory=SnapshotsConfig)
     config_path: Optional[Path] = None
 
     @property
@@ -235,6 +242,17 @@ def load_config(config_path: Optional[Path] = None) -> Optional[Config]:
         for service_name, service_data in services_raw.items():
             if isinstance(service_data, dict):
                 config.services[service_name] = _parse_service_config(service_data, root_dir)
+
+    # Parse snapshots configuration
+    snapshots_raw = data.get("snapshots")
+    if snapshots_raw:
+        if isinstance(snapshots_raw, str):
+            config.snapshots.path = root_dir / snapshots_raw
+        elif isinstance(snapshots_raw, dict):
+            if "path" in snapshots_raw:
+                config.snapshots.path = root_dir / snapshots_raw["path"]
+        else:
+            raise ValueError(f"'snapshots' must be a string or dict, got {type(snapshots_raw).__name__}")
 
     return config
 
