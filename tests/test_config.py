@@ -12,7 +12,7 @@ class TestLoadConfig:
     def test_load_simple_config(self, tmp_path):
         config_file = tmp_path / "gattc.yaml"
         config_file.write_text('''
-schemas: "gatt/"
+schemas: "gattc/"
 output:
   zephyr:
     header: "src/generated/"
@@ -21,7 +21,7 @@ output:
         config = load_config(config_file)
 
         assert config is not None
-        assert config.schemas == [tmp_path / "gatt/"]
+        assert config.schemas == [tmp_path / "gattc/"]
         assert config.output.zephyr.header == tmp_path / "src/generated/"
         assert config.output.zephyr.get_header_path() == tmp_path / "src/generated/"
         assert config.output.zephyr.get_source_path() == tmp_path / "src/generated/"
@@ -30,7 +30,7 @@ output:
         config_file = tmp_path / "gattc.yaml"
         config_file.write_text('''
 schemas:
-  - "gatt/"
+  - "gattc/"
   - "services/"
 
 output:
@@ -44,7 +44,7 @@ output:
 
         assert config is not None
         assert len(config.schemas) == 2
-        assert config.schemas[0] == tmp_path / "gatt/"
+        assert config.schemas[0] == tmp_path / "gattc/"
         assert config.schemas[1] == tmp_path / "services/"
         assert config.output.zephyr.header == tmp_path / "src/generated/"
         assert config.output.docs.path == tmp_path / "docs/ble/"
@@ -52,7 +52,7 @@ output:
     def test_load_config_with_docs_shorthand(self, tmp_path):
         config_file = tmp_path / "gattc.yaml"
         config_file.write_text('''
-schemas: "gatt/"
+schemas: "gattc/"
 output:
   zephyr:
     header: "src/generated/"
@@ -68,7 +68,7 @@ docs: "docs/"
         """Test loading config with docs per_service setting."""
         config_file = tmp_path / "gattc.yaml"
         config_file.write_text('''
-schemas: "gatt/"
+schemas: "gattc/"
 output:
   zephyr:
     header: "src/generated/"
@@ -88,7 +88,7 @@ output:
         """Test loading config with zephyr per_service setting."""
         config_file = tmp_path / "gattc.yaml"
         config_file.write_text('''
-schemas: "gatt/"
+schemas: "gattc/"
 output:
   zephyr:
     header: "include/generated/"
@@ -108,7 +108,7 @@ output:
         """Test loading config with separate header and source paths."""
         config_file = tmp_path / "gattc.yaml"
         config_file.write_text('''
-schemas: "gatt/"
+schemas: "gattc/"
 output:
   zephyr:
     header: "include/generated/"
@@ -127,7 +127,7 @@ output:
         """Test loading config with per-service configuration."""
         config_file = tmp_path / "gattc.yaml"
         config_file.write_text('''
-schemas: "gatt/"
+schemas: "gattc/"
 output:
   zephyr:
     header: "src/generated/"
@@ -172,7 +172,7 @@ class TestFindConfig:
 
     def test_find_in_current_dir(self, tmp_path):
         config_file = tmp_path / "gattc.yaml"
-        config_file.write_text("schemas: gatt/")
+        config_file.write_text("schemas: gattc/")
 
         found = find_config(tmp_path)
 
@@ -180,7 +180,7 @@ class TestFindConfig:
 
     def test_find_in_parent_dir(self, tmp_path):
         config_file = tmp_path / "gattc.yaml"
-        config_file.write_text("schemas: gatt/")
+        config_file.write_text("schemas: gattc/")
 
         subdir = tmp_path / "src" / "bluetooth"
         subdir.mkdir(parents=True)
@@ -254,7 +254,7 @@ class TestServiceConfigValidation:
 
         config_file = tmp_path / "gattc.yaml"
         config_file.write_text('''
-schemas: "gatt/"
+schemas: "gattc/"
 output:
   zephyr:
     header: "src/generated/"
@@ -277,7 +277,7 @@ services:
 
         config_file = tmp_path / "gattc.yaml"
         config_file.write_text('''
-schemas: "gatt/"
+schemas: "gattc/"
 output:
   zephyr:
     header: "src/generated/"
@@ -302,7 +302,7 @@ services:
 
         config_file = tmp_path / "gattc.yaml"
         config_file.write_text('''
-schemas: "gatt/"
+schemas: "gattc/"
 output:
   zephyr:
     header: "src/generated/"

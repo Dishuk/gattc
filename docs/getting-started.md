@@ -23,13 +23,13 @@ gattc init
 Creates:
 ```
 gattc.yaml              # Project configuration
-gatt/
+gattc/
 └── echo_service.yaml   # Example schema
 ```
 
 ### 2. Define a Service
 
-Create `gatt/temperature_service.yaml`:
+Create `gattc/temperature_service.yaml`:
 
 ```yaml
 schema_version: "1.0"
@@ -69,7 +69,7 @@ characteristics:
 gattc compile
 
 # Or specify schema and output directly
-gattc compile gatt/temperature_service.yaml -o src/ble/generated/
+gattc compile gattc/temperature_service.yaml -o src/ble/generated/
 ```
 
 Generates `temperature_service.h` and `temperature_service.c`.

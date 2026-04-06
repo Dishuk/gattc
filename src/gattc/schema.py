@@ -185,6 +185,7 @@ class Schema:
     schema_version: str
     service: Service
     characteristics: List[Characteristic] = field(default_factory=list)
+    schema_revision: Optional[int] = None  # Optional user-controlled revision number
 
 
 def _parse_field(name: str, data: Any) -> Field:
@@ -355,10 +356,16 @@ def load_schema(path: Union[Path, str]) -> Schema:
     for name, char_data in data.get("characteristics", {}).items():
         characteristics.append(_parse_characteristic(name, char_data))
 
+    # Parse optional schema_revision
+    schema_revision = data.get("schema_revision")
+    if schema_revision is not None:
+        schema_revision = int(schema_revision)
+
     return Schema(
         schema_version=data.get("schema_version", "1.0"),
         service=service,
         characteristics=characteristics,
+        schema_revision=schema_revision,
     )
 
 

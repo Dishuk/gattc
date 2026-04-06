@@ -10,7 +10,7 @@ gattc searches for `gattc.yaml` in the current directory and parent directories.
 
 ```yaml
 schemas:
-  - gatt/
+  - gattc/
 
 output:
   zephyr:
@@ -21,8 +21,8 @@ output:
 
 ```yaml
 schemas:
-  - gatt/sensor_service.yaml
-  - gatt/config_service.yaml
+  - gattc/sensor_service.yaml
+  - gattc/config_service.yaml
 
 output:
   zephyr:
@@ -50,20 +50,20 @@ Schema files or directories to compile.
 
 ```yaml
 # Single file
-schemas: gatt/my_service.yaml
+schemas: gattc/my_service.yaml
 
 # Multiple files
 schemas:
-  - gatt/sensor_service.yaml
-  - gatt/config_service.yaml
+  - gattc/sensor_service.yaml
+  - gattc/config_service.yaml
 
 # Directory (all .yaml files inside)
 schemas:
-  - gatt/
+  - gattc/
 
 # Mixed
 schemas:
-  - gatt/
+  - gattc/
   - custom/special_service.yaml
 ```
 
@@ -169,7 +169,7 @@ gattc compile
 gattc compile -o custom/path/
 
 # Ignores gattc.yaml, uses explicit paths
-gattc compile gatt/my_service.yaml -o src/generated/
+gattc compile gattc/my_service.yaml -o src/generated/
 ```
 
 ## Directory Structure
@@ -179,7 +179,7 @@ Recommended project layout:
 ```
 project/
 ├── gattc.yaml
-├── gatt/
+├── gattc/
 │   ├── sensor_service.yaml
 │   └── config_service.yaml
 ├── src/
@@ -199,7 +199,7 @@ Corresponding `gattc.yaml`:
 
 ```yaml
 schemas:
-  - gatt/
+  - gattc/
 
 output:
   zephyr:

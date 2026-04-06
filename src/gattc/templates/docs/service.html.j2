@@ -1,61 +1,107 @@
-{# Macro for rendering a single field's value cell #}
-{% macro render_value_cell(field) %}
-{% if field.bits %}
-<table class="values-table-inline">
-{% for bit in field.bits %}<tr><td class="value-code">{{ bit.range }}</td><td class="value-name">{{ bit.name }}</td></tr>
-{% endfor %}</table>
-{% elif field.values.type == "named" and field.values.items %}
-<table class="values-table-inline">
-{% for item in field.values.items %}<tr><td class="value-code">{{ item.value }}</td><td class="value-name">{{ item.name }}</td></tr>
-{% endfor %}</table>
-{% elif field.values.type in ["range", "text"] %}
-{{ field.values.display }}
-{% else %}-{% endif %}
-{% endmacro %}
+{#- Macro for determining badge class based on role -#}
+{%- macro badge_class(name) -%}
+{%- set n = name|lower -%}
+{%- if 'read' in n -%}badge-read
+{%- elif 'write' in n -%}badge-write
+{%- elif 'notify' in n or 'indicate' in n -%}badge-notify
+{%- else -%}badge-other{%- endif -%}
+{%- endmacro -%}
 
-{# Macro for rendering a payload table #}
-{% macro render_payload(payload, title) %}
-{% if payload and payload.fields %}
-<div class="payload-section">
-<div class="payload-title">{{ title }}{% if payload.size %} ({{ payload.size }} bytes){% elif payload.is_variable %} (variable length){% endif %}</div>
-<table>
-<tr><th>Name</th><th>Offset</th><th>Length</th><th>Type</th><th>Description</th><th>Value</th><th>Units</th></tr>
-{% for field in payload.fields %}
-<tr>
-<td class="field-name">{{ field.name }}</td>
-<td class="field-offset">{{ field.offset }}</td>
-<td class="field-length">{{ field.length }}</td>
-<td class="field-type">{{ field.type }}</td>
-<td>{{ field.description or "-" }}</td>
-<td class="field-value">{{ render_value_cell(field) }}</td>
-<td class="field-unit">{{ field.unit or "-" }}</td>
-</tr>
-{% if field.nested_fields %}
-<tr><td colspan="7">
-<div class="nested-struct">
-<div class="nested-title">Struct:</div>
-<table>
-<tr><th>Name</th><th>Offset</th><th>Length</th><th>Type</th><th>Description</th><th>Value</th><th>Units</th></tr>
-{% for nested in field.nested_fields %}
-<tr>
-<td class="field-name">{{ nested.name }}</td>
-<td class="field-offset">{{ nested.offset }}</td>
-<td class="field-length">{{ nested.length }}</td>
-<td class="field-type">{{ nested.type }}</td>
-<td>{{ nested.description or "-" }}</td>
-<td class="field-value">{{ render_value_cell(nested) }}</td>
-<td class="field-unit">{{ nested.unit or "-" }}</td>
-</tr>
-{% endfor %}
+{#- Macro for rendering a single field's value cell -#}
+{%- macro render_value_cell(field) -%}
+{%- if field.bits -%}
+<table class="values-table-inline">
+{%- for bit in field.bits -%}
+<tr><td class="value-code">{{ bit.range }}</td><td class="value-name">{{ bit.name }}</td></tr>
+{%- endfor -%}
 </table>
-</div>
-</td></tr>
-{% endif %}
-{% endfor %}
+{%- elif field.values.type == "named" and field.values.items -%}
+<table class="values-table-inline">
+{%- for item in field.values.items -%}
+<tr><td class="value-code">{{ item.value }}</td><td class="value-name">{{ item.name }}</td></tr>
+{%- endfor -%}
 </table>
-</div>
-{% endif %}
-{% endmacro %}
+{%- elif field.values.type in ["range", "text"] -%}
+{{ field.values.display }}
+{%- else -%}-{%- endif -%}
+{%- endmacro -%}
+
+{#- Macro for determining row class based on change status -#}
+{%- macro row_change_class(field) -%}
+{%- if field.change_status == 'added' -%}row-added
+{%- elif field.change_status == 'modified' -%}row-modified
+{%- elif field.change_status == 'removed' -%}row-removed
+{%- endif -%}
+{%- endmacro -%}
+
+{#- Macro for field change badge -#}
+{%- macro field_change_badge(field) -%}
+{%- if field.change_status == 'added' -%}<span class="badge badge-new" style="font-size: 0.65em; margin-left: 0.3rem;">NEW</span>
+{%- elif field.change_status == 'modified' -%}<span class="badge badge-changed" style="font-size: 0.65em; margin-left: 0.3rem;">CHANGED</span>
+{%- endif -%}
+{%- endmacro -%}
+
+{#- Macro for rendering a payload table -#}
+{%- macro render_payload(payload, title) -%}
+{%- if payload and payload.fields %}
+                    <div class="payload-section">
+                        <div class="payload-title">{{ title }}{% if payload.size %} ({{ payload.size }} bytes){% elif payload.is_variable %} (variable length){% endif %}</div>
+                        <table>
+                            <tr>
+                                <th>Name</th>
+                                <th>Offset</th>
+                                <th>Length</th>
+                                <th>Type</th>
+                                <th>Description</th>
+                                <th>Value</th>
+                                <th>Units</th>
+                            </tr>
+{%- for field in payload.fields %}
+                            <tr class="{{ row_change_class(field) }}">
+                                <td class="field-name">{{ field.name }}{{ field_change_badge(field) }}</td>
+                                <td class="field-offset">{{ field.offset }}</td>
+                                <td class="field-length">{{ field.length }}</td>
+                                <td class="field-type">{{ field.type }}</td>
+                                <td>{{ field.description or "-" }}</td>
+                                <td class="field-value">{{ render_value_cell(field) }}</td>
+                                <td class="field-unit">{{ field.unit or "-" }}</td>
+                            </tr>
+{%- if field.nested_fields %}
+                            <tr>
+                                <td colspan="7">
+                                    <div class="nested-struct">
+                                        <div class="nested-title">Struct:</div>
+                                        <table>
+                                            <tr>
+                                                <th>Name</th>
+                                                <th>Offset</th>
+                                                <th>Length</th>
+                                                <th>Type</th>
+                                                <th>Description</th>
+                                                <th>Value</th>
+                                                <th>Units</th>
+                                            </tr>
+{%- for nested in field.nested_fields %}
+                                            <tr>
+                                                <td class="field-name">{{ nested.name }}</td>
+                                                <td class="field-offset">{{ nested.offset }}</td>
+                                                <td class="field-length">{{ nested.length }}</td>
+                                                <td class="field-type">{{ nested.type }}</td>
+                                                <td>{{ nested.description or "-" }}</td>
+                                                <td class="field-value">{{ render_value_cell(nested) }}</td>
+                                                <td class="field-unit">{{ nested.unit or "-" }}</td>
+                                            </tr>
+{%- endfor %}
+                                        </table>
+                                    </div>
+                                </td>
+                            </tr>
+{%- endif -%}
+{%- endfor %}
+                        </table>
+                    </div>
+{%- endif -%}
+{%- endmacro -%}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -69,9 +115,41 @@
             --border-color: #e2e8f0;
             --bg-light: #f8fafc;
             --bg-code: #f1f5f9;
+            --bg-body: #ffffff;
             --text-primary: #1e293b;
             --text-secondary: #475569;
+            --badge-read-bg: #dbeafe;
+            --badge-read-text: #1d4ed8;
+            --badge-write-bg: #dcfce7;
+            --badge-write-text: #16a34a;
+            --badge-notify-bg: #fef3c7;
+            --badge-notify-text: #b45309;
+            --badge-other-bg: #f3e8ff;
+            --badge-other-text: #7c3aed;
+            --hover-bg: rgba(37, 99, 235, 0.05);
+            --active-bg: rgba(37, 99, 235, 0.1);
             --nav-width: {% if is_combined %}260px{% else %}220px{% endif %};
+        }
+
+        [data-theme="dark"] {
+            --primary-color: #60a5fa;
+            --secondary-color: #94a3b8;
+            --border-color: #334155;
+            --bg-light: #1e293b;
+            --bg-code: #334155;
+            --bg-body: #0f172a;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --badge-read-bg: #1e3a5f;
+            --badge-read-text: #93c5fd;
+            --badge-write-bg: #14532d;
+            --badge-write-text: #86efac;
+            --badge-notify-bg: #451a03;
+            --badge-notify-text: #fcd34d;
+            --badge-other-bg: #3b0764;
+            --badge-other-text: #d8b4fe;
+            --hover-bg: rgba(96, 165, 250, 0.1);
+            --active-bg: rgba(96, 165, 250, 0.15);
         }
 
         * { box-sizing: border-box; }
@@ -82,7 +160,7 @@
             color: var(--text-primary);
             margin: 0;
             padding: 0;
-            background: #fff;
+            background: var(--bg-body);
         }
 
         .layout { display: flex; min-height: 100vh; }
@@ -101,31 +179,66 @@
 
         .nav-list { list-style: none; margin: 0; padding: 0; }
         .nav-item { margin: 0; }
-        .nav-link:hover { color: var(--primary-color); background: rgba(37, 99, 235, 0.05); }
-        .nav-link.active { color: var(--primary-color); border-left-color: var(--primary-color); background: rgba(37, 99, 235, 0.1); font-weight: 500; }
+        .nav-link:hover { color: var(--primary-color); background: var(--hover-bg); }
+        .nav-link.active { color: var(--primary-color); border-left-color: var(--primary-color); background: var(--active-bg); font-weight: 500; }
 
         .content { margin-left: var(--nav-width); flex: 1; padding: 2rem 3rem; }
 
-        h1 { color: var(--primary-color); border-bottom: 3px solid var(--primary-color); padding-bottom: 0.5rem; margin-bottom: 1rem; }
-        h2 { color: var(--text-primary); margin-top: 2.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; }
+        h1 { color: var(--primary-color); border-bottom: 3px solid var(--primary-color); padding-bottom: 0.5rem; margin-bottom: 2rem; }
+        h2 { color: var(--text-primary); margin-top: 3rem; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; }
+        h2:first-of-type { margin-top: 0; }
+        .service-name { color: var(--primary-color); }
         h3 { color: var(--primary-color); margin-top: 2rem; margin-bottom: 0.5rem; }
 
-        .service-info { background: var(--bg-light); border: 1px solid var(--border-color); border-radius: 8px; padding: 1.5rem; margin-bottom: 2rem; }
+        .service-info { background: var(--bg-light); border: 1px solid var(--border-color); border-radius: 8px; margin-bottom: 3rem; padding: 1.5rem; display: flex; flex-direction: column; gap: 0.5rem; }
         .service-info p { margin: 0.5rem 0; }
         .uuid { font-family: 'Consolas', 'Monaco', monospace; background: var(--bg-code); padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.9em; }
 
         .characteristic { border: 1px solid var(--border-color); border-radius: 8px; margin-bottom: 1.5rem; overflow: hidden; scroll-margin-top: 1rem; }
         .characteristic-header { background: var(--bg-light); padding: 1rem 1.5rem; border-bottom: 1px solid var(--border-color); }
-        .characteristic-header h3 { margin: 0; }
+        .characteristic-header h3 { margin: 0 0 0.75rem 0; }
         .characteristic-body { padding: 1.5rem; }
-        .characteristic-meta { display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 0.5rem; font-size: 0.9em; }
+        .characteristic-meta { display: flex; flex-direction: column; gap: 0.4rem; font-size: 0.9em; }
         .meta-item { display: flex; align-items: center; gap: 0.5rem; }
-        .meta-label { color: var(--text-secondary); font-weight: 500; }
+        .meta-label { color: var(--text-secondary); font-weight: 500; min-width: 5.5rem; }
 
         .badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.8em; font-weight: 500; margin-right: 0.25rem; }
-        .badge-property { background: #dbeafe; color: #1d4ed8; }
-        .badge-permission { background: #dcfce7; color: #16a34a; }
-        .description { color: var(--text-secondary); margin: 0.5rem 0 0 0; }
+        .badge-read { background: var(--badge-read-bg); color: var(--badge-read-text); }
+        .badge-write { background: var(--badge-write-bg); color: var(--badge-write-text); }
+        .badge-notify { background: var(--badge-notify-bg); color: var(--badge-notify-text); }
+        .badge-other { background: var(--badge-other-bg); color: var(--badge-other-text); }
+        .badge-new { background: #22c55e; color: white; font-size: 0.7em; padding: 2px 6px; margin-left: 0.5rem; }
+        .badge-changed { background: #f59e0b; color: white; font-size: 0.7em; padding: 2px 6px; margin-left: 0.5rem; }
+        .badge-removed { background: #ef4444; color: white; font-size: 0.7em; padding: 2px 6px; margin-left: 0.5rem; text-decoration: line-through; }
+        .row-added { background: rgba(34, 197, 94, 0.1) !important; }
+        .row-modified { background: rgba(245, 158, 11, 0.1) !important; }
+        .row-removed { background: rgba(239, 68, 68, 0.1) !important; text-decoration: line-through; }
+        [data-theme="dark"] .badge-new { background: #16a34a; }
+        [data-theme="dark"] .badge-changed { background: #d97706; }
+        [data-theme="dark"] .badge-removed { background: #dc2626; }
+        [data-theme="dark"] .row-added { background: rgba(34, 197, 94, 0.15) !important; }
+        [data-theme="dark"] .row-modified { background: rgba(245, 158, 11, 0.15) !important; }
+        [data-theme="dark"] .row-removed { background: rgba(239, 68, 68, 0.15) !important; }
+        .characteristic-header .description { color: var(--text-secondary); margin: 0; }
+        .version-info { font-size: 0.9em; color: var(--text-secondary); }
+
+        .changelog { background: var(--bg-light); border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem 1.5rem; margin-bottom: 3rem; }
+        .changelog-table { width: 100%; border-collapse: collapse; font-size: 0.85em; }
+        .changelog-table th { background: var(--bg-code); text-align: left; padding: 0.4rem 0.75rem; font-weight: 600; color: var(--text-secondary); border-bottom: 2px solid var(--border-color); }
+        .changelog-table td { padding: 0.35rem 0.75rem; border-bottom: 1px solid var(--border-color); vertical-align: top; }
+        .changelog-table tr:hover { background: none; }
+        .changelog-table .col-revision { width: 8%; white-space: nowrap; text-align: center; }
+        .changelog-table .col-date { width: 15%; white-space: nowrap; color: var(--text-secondary); }
+        .changelog-table .col-changes { width: 75%; }
+        .changelog-changes { font-family: 'Consolas', 'Monaco', monospace; font-size: 0.9em; line-height: 1.4; margin: 0; padding: 0; }
+        .changelog-changes span { display: block; white-space: pre; margin: 0; padding: 0; }
+        .changelog-changes .added { color: #16a34a; }
+        .changelog-changes .removed { color: #dc2626; }
+        .changelog-changes .modified { color: #d97706; }
+        [data-theme="dark"] .changelog-changes .added { color: #4ade80; }
+        [data-theme="dark"] .changelog-changes .removed { color: #f87171; }
+        [data-theme="dark"] .changelog-changes .modified { color: #fbbf24; }
+        .changelog-empty { color: var(--text-secondary); font-style: italic; text-align: center; padding: 1rem; }
 
         table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.9em; table-layout: fixed; }
         th, td { padding: 0.4rem 0.5rem; text-align: left; vertical-align: top; border-bottom: 1px solid var(--border-color); word-wrap: break-word; }
@@ -164,20 +277,27 @@
 
         footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--border-color); color: var(--text-secondary); font-size: 0.85em; text-align: center; }
 
+        .theme-toggle-container { position: absolute; bottom: 1rem; left: 0; right: 0; display: flex; justify-content: center; align-items: center; gap: 0.5rem; font-size: 0.85em; }
+        .theme-label { color: var(--text-secondary); font-weight: 500; }
+        .theme-toggle { background: var(--bg-code); border: 1px solid var(--border-color); border-radius: 4px; padding: 0.2rem 0.5rem; cursor: pointer; font-size: 1em; color: var(--text-secondary); }
+        .theme-toggle:hover { background: var(--hover-bg); color: var(--primary-color); }
+
         @media print {
             .nav { display: none; }
+            .theme-toggle-container { display: none; }
             .content { margin-left: 0; max-width: none; padding: 1rem; }
             .characteristic { break-inside: avoid; }
-            {% if is_combined %}.service-section { break-before: page; }
-            .service-section:first-child { break-before: auto; }{% endif %}
+{%- if is_combined %}
+            .service-section { break-before: page; }
+            .service-section:first-child { break-before: auto; }
+{%- endif %}
         }
 
         @media (max-width: 900px) {
             .nav { display: none; }
             .content { margin-left: 0; }
         }
-
-        {% if is_combined %}
+{% if is_combined %}
         .nav-header { padding: 0.5rem 1rem 1rem; border-bottom: 1px solid var(--border-color); margin-bottom: 0.5rem; }
         .nav-header h2 { margin: 0; font-size: 1em; color: var(--primary-color); }
         .nav-section { margin-bottom: 0.5rem; }
@@ -190,89 +310,196 @@
         .nav-link { display: block; padding: 0.3rem 1rem 0.3rem 2rem; color: var(--text-secondary); text-decoration: none; font-size: 0.8em; border-left: 3px solid transparent; transition: all 0.15s ease; }
         .nav-link.service-link { padding-left: 1rem; font-weight: 500; color: var(--text-primary); }
         .service-section { margin-bottom: 4rem; scroll-margin-top: 1rem; }
-        {% else %}
+        .service-section + .service-section { margin-top: 5rem; }
+{% else %}
         .nav-title { font-size: 0.75em; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; padding: 0.5rem 1rem; margin: 0; }
         .nav-link { display: block; padding: 0.4rem 1rem; color: var(--text-secondary); text-decoration: none; font-size: 0.85em; border-left: 3px solid transparent; transition: all 0.15s ease; }
-        {% endif %}
+{% endif %}
     </style>
 </head>
 <body>
     <div class="layout">
         <nav class="nav">
-            {% if is_combined %}
-            <div class="nav-header"><h2>GATT Services</h2></div>
-            {% for svc in services %}
+            <div class="theme-toggle-container">
+                <span class="theme-label">Theme:</span>
+                <button class="theme-toggle" id="theme-toggle" title="Toggle theme">&#9790;</button>
+            </div>
+{%- if is_combined %}
+            <div class="nav-header">
+                <h2>GATT Services</h2>
+            </div>
+{%- for svc in services %}
             <div class="nav-section">
                 <h4 class="nav-service-title" data-service="{{ svc.service.name }}">
                     <span class="arrow">&#9660;</span>
-                    <a href="#{{ svc.service.name }}" class="nav-link service-link">{{ svc.service.name }}</a>
+                    <a href="#{{ svc.service.name }}-service-info" class="nav-link service-link">{{ svc.service.name }}</a>
                 </h4>
                 <ul class="nav-list" id="nav-{{ svc.service.name }}">
-                    {% for char in svc.characteristics %}
+{%- if svc.changelog %}
+                    <li class="nav-item"><a href="#{{ svc.service.name }}-changelog" class="nav-link">Changelog</a></li>
+{%- endif %}
+{%- for char in svc.characteristics %}
                     <li class="nav-item"><a href="#{{ svc.service.name }}-{{ char.name }}" class="nav-link">{{ char.name }}</a></li>
-                    {% endfor %}
+{%- endfor %}
                 </ul>
             </div>
-            {% endfor %}
-            {% else %}
+{%- endfor %}
+{%- else %}
+            <h4 class="nav-title">Service</h4>
+            <ul class="nav-list">
+                <li class="nav-item"><a href="#service-info" class="nav-link">{{ services[0].service.name }}</a></li>
+            </ul>
+{%- if services[0].changelog %}
+            <h4 class="nav-title">Changelog</h4>
+            <ul class="nav-list">
+                <li class="nav-item"><a href="#changelog" class="nav-link">View Changes</a></li>
+            </ul>
+{%- endif %}
             <h4 class="nav-title">Characteristics</h4>
             <ul class="nav-list">
-                {% for char in services[0].characteristics %}
+{%- for char in services[0].characteristics %}
                 <li class="nav-item"><a href="#{{ char.name }}" class="nav-link">{{ char.name }}</a></li>
-                {% endfor %}
+{%- endfor %}
             </ul>
-            {% endif %}
+{%- endif %}
         </nav>
 
         <main class="content">
-            <h1>{{ title }}</h1>
+{%- for svc in services %}
+{%- if is_combined %}
+            <section class="service-section" id="{{ svc.service.name }}">
+{%- endif %}
 
-            {% for svc in services %}
-            {% if is_combined %}<section class="service-section" id="{{ svc.service.name }}"><h2>{{ svc.service.name }}</h2>{% endif %}
-
+            <h2 id="{% if is_combined %}{{ svc.service.name }}-{% endif %}service-info">Service: <span class="service-name">{{ svc.service.name }}</span></h2>
             <div class="service-info">
-                <p><strong>UUID:</strong> <span class="uuid">{{ svc.service.uuid }}</span></p>
-                {% if svc.service.description %}<p class="description">{{ svc.service.description }}</p>{% endif %}
+                <div class="meta-item">
+                    <span class="meta-label">UUID:</span>
+                    <span class="uuid">{{ svc.service.uuid }}</span>
+                </div>
+{%- if svc.service.schema_version or svc.service.schema_revision %}
+                <div class="meta-item">
+                    <span class="meta-label">Version:</span>
+                    <span>{{ svc.service.schema_version or "1.0" }}{% if svc.service.schema_revision %} (Rev {{ svc.service.schema_revision }}){% endif %}</span>
+                </div>
+{%- endif %}
+{%- if svc.service.description %}
+                <p class="description">{{ svc.service.description }}</p>
+{%- endif %}
             </div>
 
-            <h{% if is_combined %}3{% else %}2{% endif %}>Characteristics</h{% if is_combined %}3{% else %}2{% endif %}>
+{%- if svc.changelog %}
+            <h2 id="{% if is_combined %}{{ svc.service.name }}-{% endif %}changelog">Changelog</h2>
+            <div class="changelog">
+{%- if svc.changelog|length > 0 %}
+                <table class="changelog-table">
+                    <thead>
+                        <tr>
+                            <th class="col-revision">Rev</th>
+                            <th class="col-date">Date</th>
+                            <th class="col-changes">Changes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+{%- for entry in svc.changelog %}
+                        <tr>
+                            <td class="col-revision">{{ entry.revision }}</td>
+                            <td class="col-date">{{ entry.timestamp[:16] }}</td>
+                            <td class="col-changes"><div class="changelog-changes">{%- if entry.changes is defined %}
+{#- Old format: pre-formatted strings -#}
+{%- for change in entry.changes %}
+{%- set trimmed = change.strip() %}
+{%- if trimmed.startswith('+') %}<span class="added">{{ change }}</span>
+{% elif trimmed.startswith('-') %}<span class="removed">{{ change }}</span>
+{% elif trimmed.startswith('~') %}<span class="modified">{{ change|replace('~ ', '  ', 1) }}</span>
+{% else %}{{ change }}
+{% endif %}
+{%- endfor %}
+{%- else %}
+{#- New format: structured data -#}
+{%- for change in entry.service_changes|default([]) %}
+{{ change }}
+{% endfor %}
+{%- if entry.schema_revision is defined %}
+Schema revision: {{ entry.schema_revision.old|default('none') }} -> {{ entry.schema_revision.new|default('none') }}
+{% endif %}
+{%- for name in entry.characteristics.added|default([]) %}
+<span class="added">Characteristic added: {{ name }}</span>
+{% endfor %}
+{%- for name in entry.characteristics.removed|default([]) %}
+<span class="removed">Characteristic removed: {{ name }}</span>
+{% endfor %}
+{%- for name, mods in (entry.characteristics.modified|default({}))|dictsort %}
+<span>  Characteristic: {{ name }}</span>
+{%- if mods.uuid is defined %}
+<span class="modified">    UUID changed: {{ mods.uuid.old }} -> {{ mods.uuid.new }}</span>{% endif -%}
+{%- if mods.description_changed %}
+<span class="modified">    Description changed</span>{% endif -%}
+{%- if mods.payload_config_changed %}
+<span class="modified">    Payload config changed</span>{% endif -%}
+{%- for prop in mods.properties_added|default([]) %}
+<span class="added">    Property added: {{ prop }}</span>{% endfor -%}
+{%- for prop in mods.properties_removed|default([]) %}
+<span class="removed">    Property removed: {{ prop }}</span>{% endfor -%}
+{%- for fld in mods.fields_added|default([]) %}
+<span class="added">    Field added: {{ fld.name }}{% if fld.type %} ({{ fld.type }}){% endif %}</span>{% endfor -%}
+{%- for fld in mods.fields_removed|default([]) %}
+<span class="removed">    Field removed: {{ fld }}</span>{% endfor -%}
+{%- for fld in mods.fields_modified|default([]) %}
+<span class="modified">    Field changed: {{ fld.name }}{% if fld.detail %} ({{ fld.detail }}){% endif %}</span>{% endfor -%}
+{%- if mods.offsets_changed %}
+<span class="modified">    Payload offsets changed</span>{% endif -%}
+{%- endfor -%}
+{%- endif -%}</div></td>
+                        </tr>
+{%- endfor %}
+                    </tbody>
+                </table>
+{%- else %}
+                <p class="changelog-empty">No changes recorded yet.</p>
+{%- endif %}
+            </div>
+{%- endif %}
 
-            {% for char in svc.characteristics %}
+            <h2>Characteristics</h2>
+{%- for char in svc.characteristics %}
+
             <div class="characteristic" id="{% if is_combined %}{{ svc.service.name }}-{% endif %}{{ char.name }}">
                 <div class="characteristic-header">
-                    <h3>{{ char.name }}</h3>
+                    <h3>{{ char.name }}{% if char.change_status == 'added' %}<span class="badge badge-new">NEW</span>{% elif char.change_status == 'modified' %}<span class="badge badge-changed">CHANGED</span>{% elif char.change_status == 'removed' %}<span class="badge badge-removed">REMOVED</span>{% endif %}</h3>
                     <div class="characteristic-meta">
-                        <div class="meta-item"><span class="meta-label">UUID:</span> <span class="uuid">{{ char.uuid }}</span></div>
-                    </div>
-                    <div class="characteristic-meta">
+                        <div class="meta-item">
+                            <span class="meta-label">UUID:</span>
+                            <span class="uuid">{{ char.uuid }}</span>
+                        </div>
                         <div class="meta-item">
                             <span class="meta-label">Properties:</span>
-                            {% for prop in char.properties %}<span class="badge badge-property">{{ prop }}</span>{% endfor %}
+{%- for prop in char.properties %} <span class="badge {{ badge_class(prop) }}">{{ prop }}</span>{%- endfor %}
                         </div>
-                    </div>
-                    <div class="characteristic-meta">
                         <div class="meta-item">
                             <span class="meta-label">Permissions:</span>
-                            {% for perm in char.permissions %}<span class="badge badge-permission">{{ perm }}</span>{% endfor %}
+{%- for perm in char.permissions %} <span class="badge {{ badge_class(perm) }}">{{ perm }}</span>{%- endfor %}
                         </div>
+{%- if char.description %}
+                        <p class="description">{{ char.description }}</p>
+{%- endif %}
                     </div>
-                    {% if char.description %}<p class="description">{{ char.description }}</p>{% endif %}
                 </div>
 
                 <div class="characteristic-body">
-                    {{ render_payload(char.payload, "Payload") }}
-                    {{ render_payload(char.read_payload, "Read Payload") }}
-                    {{ render_payload(char.write_payload, "Write Payload") }}
-                    {{ render_payload(char.notify_payload, "Notify Payload") }}
-                    {% if not char.payload and not char.read_payload and not char.write_payload and not char.notify_payload %}
+{{- render_payload(char.payload, "Payload") -}}
+{{- render_payload(char.read_payload, "Read Payload") -}}
+{{- render_payload(char.write_payload, "Write Payload") -}}
+{{- render_payload(char.notify_payload, "Notify Payload") -}}
+{%- if not char.payload and not char.read_payload and not char.write_payload and not char.notify_payload %}
                     <p style="color: var(--text-secondary); font-style: italic;">No payload defined</p>
-                    {% endif %}
+{%- endif %}
                 </div>
             </div>
-            {% endfor %}
-
-            {% if is_combined %}</section>{% endif %}
-            {% endfor %}
+{%- endfor %}
+{%- if is_combined %}
+            </section>
+{%- endif %}
+{%- endfor %}
 
             <footer>Generated by gattc</footer>
         </main>
@@ -280,7 +507,15 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            {% if is_combined %}
+            const toggle = document.getElementById('theme-toggle');
+            const setTheme = (dark) => {
+                document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+                toggle.textContent = dark ? '\u2600' : '\u263E';
+                localStorage.setItem('theme', dark ? 'dark' : 'light');
+            };
+            setTheme(localStorage.getItem('theme') === 'dark');
+            toggle.addEventListener('click', () => setTheme(document.documentElement.getAttribute('data-theme') !== 'dark'));
+{% if is_combined %}
             document.querySelectorAll('.nav-service-title').forEach(title => {
                 title.addEventListener('click', function(e) {
                     if (e.target.classList.contains('nav-link')) return;
@@ -289,34 +524,49 @@
                 });
             });
             const navLinks = document.querySelectorAll('.nav-link:not(.service-link)');
-            const serviceLinks = document.querySelectorAll('.nav-link.service-link');
-            const chars = document.querySelectorAll('.characteristic');
-            const sections = document.querySelectorAll('.service-section');
-
+            // Collect all nav targets (changelogs + characteristics) and sort by position
+            const allTargets = [
+                ...document.querySelectorAll('h2[id$="-changelog"]'),
+                ...document.querySelectorAll('.characteristic')
+            ].sort((a, b) => a.offsetTop - b.offsetTop);
             function updateActiveLink() {
                 const scrollPos = window.scrollY + 100;
-                let currentChar = '', currentService = '';
-                chars.forEach(c => { if (scrollPos >= c.offsetTop && scrollPos < c.offsetTop + c.offsetHeight) currentChar = c.id; });
-                sections.forEach(s => { if (scrollPos >= s.offsetTop && scrollPos < s.offsetTop + s.offsetHeight) currentService = s.id; });
+                let currentItem = '';
+                // Check all targets (changelogs and characteristics) sorted by position
+                allTargets.forEach(t => { if (scrollPos >= t.offsetTop) currentItem = t.id; });
+                // Handle bottom of page
                 if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 50) {
-                    if (chars.length) currentChar = chars[chars.length - 1].id;
-                    if (sections.length) currentService = sections[sections.length - 1].id;
+                    if (allTargets.length) currentItem = allTargets[allTargets.length - 1].id;
                 }
-                navLinks.forEach(l => { l.classList.toggle('active', l.getAttribute('href') === '#' + currentChar); });
-                serviceLinks.forEach(l => { l.classList.toggle('active', l.getAttribute('href') === '#' + currentService); });
+                navLinks.forEach(l => l.classList.toggle('active', l.getAttribute('href') === '#' + currentItem));
             }
-            {% else %}
+{% else %}
             const navLinks = document.querySelectorAll('.nav-link');
-            const sections = document.querySelectorAll('.characteristic');
-
+            const serviceHeader = document.getElementById('service-info');
+            const changelogHeader = document.getElementById('changelog');
+            const chars = document.querySelectorAll('.characteristic');
             function updateActiveLink() {
                 const scrollPos = window.scrollY + 100;
                 let current = '';
-                sections.forEach(s => { if (scrollPos >= s.offsetTop && scrollPos < s.offsetTop + s.offsetHeight) current = s.id; });
-                if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 50) current = sections[sections.length - 1].id;
-                navLinks.forEach(l => { l.classList.toggle('active', l.getAttribute('href') === '#' + current); });
+                // Check service section
+                if (serviceHeader && scrollPos >= serviceHeader.offsetTop) {
+                    current = 'service-info';
+                }
+                // Check changelog section
+                if (changelogHeader && scrollPos >= changelogHeader.offsetTop) {
+                    current = 'changelog';
+                }
+                // Check characteristics
+                chars.forEach(c => {
+                    if (scrollPos >= c.offsetTop) current = c.id;
+                });
+                // Handle bottom of page
+                if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 50) {
+                    if (chars.length) current = chars[chars.length - 1].id;
+                }
+                navLinks.forEach(l => l.classList.toggle('active', l.getAttribute('href') === '#' + current));
             }
-            {% endif %}
+{% endif %}
             window.addEventListener('scroll', updateActiveLink);
             updateActiveLink();
         });

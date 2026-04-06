@@ -106,8 +106,8 @@ gattc init
 
 Creates:
 - `gattc.yaml` - Project configuration file
-- `gatt/` - Schema directory
-- `gatt/echo_service.yaml` - Example schema
+- `gattc/` - Schema directory
+- `gattc/echo_service.yaml` - Example schema
 
 **Example:**
 

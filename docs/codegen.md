@@ -4,8 +4,8 @@
 
 **Provide tools, not restrictions.**
 
-- Developer CAN use generated utilities → guaranteed schema sync
-- Developer CAN ignore them → full freedom, manual responsibility
+- Developer CAN use generated utilities -> guaranteed schema sync
+- Developer CAN ignore them -> full freedom, manual responsibility
 - No forced patterns, no wrapper requirements
 
 ## What Gets Generated
@@ -40,7 +40,7 @@ _Static_assert(sizeof(my_service_shock_threshold_t) == MY_SERVICE_SHOCK_THRESHOL
                "my_service_shock_threshold size mismatch");
 ```
 
-### 3. Pack function (values → buffer)
+### 3. Pack function (values -> buffer)
 
 For sending data (read callback, notify):
 
@@ -53,7 +53,7 @@ static inline void my_service_shock_threshold_pack(
 }
 ```
 
-### 4. Unpack function (buffer → values)
+### 4. Unpack function (buffer -> values)
 
 For receiving data (write callback):
 

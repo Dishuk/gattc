@@ -2,13 +2,15 @@
 HTML documentation generator for GATT schemas.
 """
 
+from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from jinja2 import Environment, PackageLoader
 
 from ..schema import Field, Payload, Schema
+from ..diff import SchemaDiff
 
 
 def _format_type(field: Field) -> str:
@@ -138,21 +140,47 @@ def _build_payload_data(payload: Payload) -> Dict[str, Any]:
     }
 
 
-def _build_docs_context(schema: Schema) -> Dict[str, Any]:
-    """Build context dictionary for documentation template."""
+def _build_docs_context(
+    schema: Schema,
+    diff: Optional[SchemaDiff] = None,
+    changelog: Optional[List[Dict[str, Any]]] = None
+) -> Dict[str, Any]:
+    """Build context dictionary for documentation template.
+
+    Args:
+        schema: The schema to build context for.
+        diff: Optional diff object for change highlighting.
+        changelog: Optional list of changelog history entries.
+    """
     characteristics = []
 
     for char in schema.characteristics:
+        # Get change status for this characteristic
+        char_status = diff.get_characteristic_status(char.name) if diff else None
+
+        # Build payload data with field change status
+        def build_payload_with_diff(payload, payload_type: str):
+            if not payload:
+                return None
+            data = _build_payload_data(payload)
+            # Add field status from diff
+            if diff and char_status == 'modified':
+                for field_data in data['fields']:
+                    field_status = diff.get_field_status(char.name, field_data['name'])
+                    field_data['change_status'] = field_status
+            return data
+
         char_data = {
             "name": char.name,
             "uuid": char.uuid,
             "description": char.description,
             "properties": char.properties,
             "permissions": char.permissions,
-            "payload": _build_payload_data(char.payload) if char.payload else None,
-            "read_payload": _build_payload_data(char.read_payload) if char.read_payload else None,
-            "write_payload": _build_payload_data(char.write_payload) if char.write_payload else None,
-            "notify_payload": _build_payload_data(char.notify_payload) if char.notify_payload else None,
+            "payload": build_payload_with_diff(char.payload, 'payload'),
+            "read_payload": build_payload_with_diff(char.read_payload, 'read_payload'),
+            "write_payload": build_payload_with_diff(char.write_payload, 'write_payload'),
+            "notify_payload": build_payload_with_diff(char.notify_payload, 'notify_payload'),
+            "change_status": char_status,
         }
         characteristics.append(char_data)
 
@@ -161,8 +189,12 @@ def _build_docs_context(schema: Schema) -> Dict[str, Any]:
             "name": schema.service.name,
             "uuid": schema.service.uuid,
             "description": schema.service.description,
+            "schema_version": schema.schema_version,
+            "schema_revision": schema.schema_revision,
         },
         "characteristics": characteristics,
+        "has_changes": diff.has_changes if diff else False,
+        "changelog": changelog or [],
     }
 
 
@@ -176,12 +208,19 @@ def _get_jinja_env() -> Environment:
     )
 
 
-def generate(schema: Schema, output_path: Path) -> Path:
+def generate(
+    schema: Schema,
+    output_path: Path,
+    diff: Optional[SchemaDiff] = None,
+    changelog: Optional[List[Dict[str, Any]]] = None
+) -> Path:
     """Generate HTML documentation for a GATT service.
 
     Args:
         schema: The GATT schema to generate documentation from.
         output_path: Path for output HTML file.
+        diff: Optional diff object for change highlighting.
+        changelog: Optional changelog history list.
 
     Returns:
         Path to the generated HTML file.
@@ -198,7 +237,7 @@ def generate(schema: Schema, output_path: Path) -> Path:
     template = env.get_template("service.html.j2")
 
     context = {
-        "services": [_build_docs_context(schema)],
+        "services": [_build_docs_context(schema, diff, changelog)],
         "title": f"{schema.service.name} - GATT Service Documentation",
         "is_combined": False,
     }
@@ -211,12 +250,19 @@ def generate(schema: Schema, output_path: Path) -> Path:
     return output_path
 
 
-def generate_combined(schemas: List[Schema], output_path: Path) -> Path:
+def generate_combined(
+    schemas: List[Schema],
+    output_path: Path,
+    diffs: Optional[Dict[str, SchemaDiff]] = None,
+    changelogs: Optional[Dict[str, List[Dict[str, Any]]]] = None
+) -> Path:
     """Generate combined HTML documentation for multiple GATT services.
 
     Args:
         schemas: List of GATT schemas to include in documentation.
         output_path: Path for output HTML file.
+        diffs: Optional dict mapping service name to diff object.
+        changelogs: Optional dict mapping service name to changelog history.
 
     Returns:
         Path to the generated HTML file.
@@ -232,8 +278,15 @@ def generate_combined(schemas: List[Schema], output_path: Path) -> Path:
     env = _get_jinja_env()
     template = env.get_template("service.html.j2")
 
+    # Build contexts with diffs and changelogs if available
+    services = []
+    for schema in schemas:
+        diff = diffs.get(schema.service.name) if diffs else None
+        changelog = changelogs.get(schema.service.name) if changelogs else None
+        services.append(_build_docs_context(schema, diff, changelog))
+
     context = {
-        "services": [_build_docs_context(schema) for schema in schemas],
+        "services": services,
         "title": "GATT Services Documentation",
         "is_combined": True,
     }
