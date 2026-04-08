@@ -1,7 +1,11 @@
 """Tests for schema parsing."""
 
 import pytest
-from gattc.schema import parse_type, TypeInfo, _parse_field, _parse_payload, load_schema, validate_schema, _is_valid_uuid
+from gattc.schema import (
+    parse_type, TypeInfo, Field, Payload, Characteristic, Service, Schema,
+    _parse_field, _parse_payload, load_schema, validate_schema,
+    _is_valid_uuid, _validate_c_identifier,
+)
 from pathlib import Path
 
 
@@ -263,3 +267,91 @@ class TestUuidValidation:
 
     def test_invalid_uuid_empty(self):
         assert not _is_valid_uuid("")
+
+
+class TestValidateCIdentifier:
+    """Tests for _validate_c_identifier function."""
+
+    def test_valid_simple(self):
+        assert _validate_c_identifier("temperature") is None
+
+    def test_valid_with_underscores(self):
+        assert _validate_c_identifier("my_field") is None
+
+    def test_valid_starts_with_underscore(self):
+        assert _validate_c_identifier("_value") is None
+
+    def test_invalid_starts_with_digit(self):
+        assert _validate_c_identifier("123abc") is not None
+
+    def test_invalid_contains_hyphen(self):
+        assert _validate_c_identifier("foo-bar") is not None
+
+    def test_invalid_contains_space(self):
+        assert _validate_c_identifier("my field") is not None
+
+    def test_invalid_empty(self):
+        assert _validate_c_identifier("") is not None
+
+    def test_invalid_keyword_int(self):
+        reason = _validate_c_identifier("int")
+        assert reason is not None
+        assert "reserved keyword" in reason
+
+    def test_invalid_keyword_static(self):
+        assert _validate_c_identifier("static") is not None
+
+    def test_valid_keyword_like(self):
+        assert _validate_c_identifier("integer") is None
+
+
+def _make_schema(service_name="test_svc", char_name="temperature", field_name="value", bits=None):
+    """Helper to build a minimal valid Schema for validation tests."""
+    field = Field(name=field_name, type_info=parse_type("uint8"), offset=0, bits=bits)
+    payload = Payload(fields=[field])
+    char = Characteristic(
+        name=char_name,
+        uuid="12345678-1234-1234-1234-123456789abc",
+        properties=["read"],
+        permissions=["read"],
+        payload=payload,
+    )
+    return Schema(
+        schema_version="1.0",
+        service=Service(name=service_name, uuid="12345678-1234-1234-1234-123456789001"),
+        characteristics=[char],
+    )
+
+
+class TestValidateSchemaIdentifiers:
+    """Tests for C identifier validation in validate_schema."""
+
+    def test_valid_names_no_errors(self):
+        schema = _make_schema()
+        errors = validate_schema(schema)
+        assert not any("C identifier" in e for e in errors)
+
+    def test_invalid_service_name(self):
+        schema = _make_schema(service_name="my-service")
+        errors = validate_schema(schema)
+        assert any("Service name" in e and "C identifier" in e for e in errors)
+
+    def test_invalid_char_name(self):
+        schema = _make_schema(char_name="123bad")
+        errors = validate_schema(schema)
+        assert any("Characteristic name" in e and "C identifier" in e for e in errors)
+
+    def test_invalid_field_name(self):
+        schema = _make_schema(field_name="int")
+        errors = validate_schema(schema)
+        assert any("Field name" in e and "C identifier" in e for e in errors)
+
+    def test_invalid_bit_name(self):
+        schema = _make_schema(bits={"0": "foo bar"})
+        errors = validate_schema(schema)
+        assert any("Bit name" in e and "C identifier" in e for e in errors)
+
+    def test_multiple_invalid_names_all_reported(self):
+        schema = _make_schema(service_name="bad-svc", char_name="1char", field_name="my field")
+        errors = [e for e in validate_schema(schema) if "C identifier" in e]
+        assert len(errors) >= 3

@@ -18,6 +18,18 @@ PAYLOAD_MAX_SIZE_KEY = "_max_size"
 # Payload type names (field names on Characteristic dataclass)
 PAYLOAD_TYPES = ('payload', 'read_payload', 'write_payload', 'notify_payload')
 
+# C11 reserved keywords
+C_KEYWORDS = frozenset({
+    "auto", "break", "case", "char", "const", "continue", "default", "do",
+    "double", "else", "enum", "extern", "float", "for", "goto", "if",
+    "inline", "int", "long", "register", "restrict", "return", "short",
+    "signed", "sizeof", "static", "struct", "switch", "typedef", "union",
+    "unsigned", "void", "volatile", "while",
+    "_Alignas", "_Alignof", "_Atomic", "_Bool", "_Complex", "_Generic",
+    "_Imaginary", "_Noreturn", "_Static_assert", "_Thread_local",
+    "true", "false",
+})
+
 # Type size mapping (base types without endianness suffix)
 BASE_TYPE_SIZES = {
     "uint8": 1,
@@ -378,6 +390,18 @@ def _is_valid_uuid(uuid: str) -> bool:
     return bool(re.match(pattern, uuid))
 
 
+def _validate_c_identifier(name: str) -> Optional[str]:
+    """Check if a name is a valid C identifier.
+
+    Returns None if valid, or a reason string if invalid.
+    """
+    if not re.match(r'^[A-Za-z_][A-Za-z0-9_]*$', name):
+        return "must start with a letter or underscore and contain only letters, digits, underscores"
+    if name in C_KEYWORDS:
+        return "is a C reserved keyword"
+    return None
+
+
 def validate_schema(schema: Schema) -> List[str]:
     """Validate a GATT schema.
 
@@ -388,6 +412,11 @@ def validate_schema(schema: Schema) -> List[str]:
         List of validation error messages (empty if valid).
     """
     errors = []
+
+    # Validate names are valid C identifiers
+    reason = _validate_c_identifier(schema.service.name)
+    if reason:
+        errors.append(f"Service name '{schema.service.name}' is not a valid C identifier: {reason}")
 
     if not schema.service.uuid:
         errors.append("Service UUID is required")
@@ -408,6 +437,10 @@ def validate_schema(schema: Schema) -> List[str]:
         seen_uuids.add(char.uuid)
 
     for char in schema.characteristics:
+        reason = _validate_c_identifier(char.name)
+        if reason:
+            errors.append(f"Characteristic name '{char.name}' is not a valid C identifier: {reason}")
+
         if not char.uuid:
             errors.append(f"Characteristic '{char.name}' missing UUID")
         elif not _is_valid_uuid(char.uuid):
@@ -435,11 +468,22 @@ def validate_schema(schema: Schema) -> List[str]:
                     if fname in seen_fields:
                         errors.append(f"Duplicate field name '{fname}' in '{char.name}'")
                     seen_fields.add(fname)
+                    reason = _validate_c_identifier(fname)
+                    if reason:
+                        errors.append(f"Field name '{fname}' in '{char.name}' is not a valid C identifier: {reason}")
 
                 for field in payload.fields:
+                    if field.fields:
+                        for nested in field.fields:
+                            reason = _validate_c_identifier(nested.name)
+                            if reason:
+                                errors.append(f"Field name '{nested.name}' in '{char.name}.{field.name}' is not a valid C identifier: {reason}")
                     if field.bits:
                         max_bit = field.type_info.size * 8 - 1
-                        for bit_spec in field.bits.keys():
+                        for bit_spec, bit_name in field.bits.items():
+                            reason = _validate_c_identifier(bit_name)
+                            if reason:
+                                errors.append(f"Bit name '{bit_name}' in '{char.name}.{field.name}' is not a valid C identifier: {reason}")
                             bit_spec_str = str(bit_spec)
                             if "-" in bit_spec_str:
                                 # Range like "3-5"
