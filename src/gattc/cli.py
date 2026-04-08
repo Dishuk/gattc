@@ -12,9 +12,9 @@ from . import __version__
 from .config import Config, find_schemas, load_config, OutputConfig
 from .schema import load_and_validate_schema, load_schema, Schema
 from .generators import zephyr
-from .snapshot import get_snapshot_dir, load_snapshot, save_snapshot, snapshot_exists
+from .snapshot import get_snapshot_path, load_snapshot, save_snapshot
 from .diff import diff_schemas, SchemaDiff
-from .changelog import add_changelog_entry, load_changelog
+from .changelog import add_changelog_entry, load_changelog, save_changelog
 
 
 @click.group()
@@ -171,6 +171,19 @@ def _get_output_config_for_service(config: Optional[Config], service_name: str) 
     return config.output
 
 
+def _load_diff(
+    service_name: str,
+    schema: Schema,
+    config: Optional[Config],
+    root_dir: Path,
+) -> Tuple[bool, Optional[SchemaDiff]]:
+    """Load snapshot and compute diff. Returns (snapshot_existed, diff_or_None)."""
+    snapshot = load_snapshot(service_name, config, root_dir)
+    if snapshot is None:
+        return False, None
+    return True, diff_schemas(snapshot, schema)
+
+
 def _compile_schema(
     schema_path: Path,
     output_dir: Optional[Path],
@@ -210,21 +223,12 @@ def _compile_schema(
     # Determine root directory for snapshots
     root_dir = config.root_dir if config else Path.cwd()
 
-    # Perform diff if enabled
+    # Perform diff if enabled (read-only — does not update snapshots or changelog)
     changelog_history = []
+    has_snapshot = False
     if enable_diff:
-        snapshot = load_snapshot(service_name, config, root_dir)
-        if snapshot is not None:
-            diff = diff_schemas(snapshot, s)
-            # Add to changelog history if changes detected
-            if diff.has_changes:
-                changelog_history = add_changelog_entry(service_name, s, diff, config, root_dir)
-            else:
-                changelog_history = load_changelog(service_name, config, root_dir)
-        else:
-            changelog_history = load_changelog(service_name, config, root_dir)
-        # Always save current schema as snapshot for next comparison
-        save_snapshot(service_name, s, config, root_dir)
+        has_snapshot, diff = _load_diff(service_name, s, config, root_dir)
+        changelog_history = load_changelog(service_name, config, root_dir)
 
     # Determine final paths (CLI args override config)
     final_header_dir = header_dir or effective_output.zephyr.get_header_path()
@@ -254,7 +258,8 @@ def _compile_schema(
     if generate_docs and effective_docs_dir:
         from .generators import docs as docs_gen
         docs_output = effective_docs_dir / f"{schema_path.stem}.html"
-        html_path = docs_gen.generate(s, docs_output, diff=diff, changelog=changelog_history)
+        unreleased = enable_diff and (not has_snapshot or (diff is not None and diff.has_changes))
+        html_path = docs_gen.generate(s, docs_output, diff=diff, changelog=changelog_history, unreleased=unreleased)
         generated.append(html_path)
 
     return generated, diff
@@ -404,21 +409,16 @@ def _compile_combined_mode(
     if enable_diff:
         for s in loaded_schemas:
             service_name = s.service.name
-            snapshot = load_snapshot(service_name, config, root_dir)
-            if snapshot is not None:
-                diff = diff_schemas(snapshot, s)
+            has_snapshot, diff = _load_diff(service_name, s, config, root_dir)
+            if diff is not None:
+                diffs[service_name] = diff
                 if diff.has_changes:
                     changes_detected = True
                     click.echo(f"\n{service_name}: Changes detected")
                     click.echo(diff.to_changelog_text())
-                    changelogs[service_name] = add_changelog_entry(service_name, s, diff, config, root_dir)
-                else:
-                    changelogs[service_name] = load_changelog(service_name, config, root_dir)
-                diffs[service_name] = diff
-            else:
-                changelogs[service_name] = load_changelog(service_name, config, root_dir)
-            # Always save current schema as snapshot for next comparison
-            save_snapshot(service_name, s, config, root_dir)
+            elif not has_snapshot:
+                changes_detected = True  # no snapshot = never released
+            changelogs[service_name] = load_changelog(service_name, config, root_dir)
 
     header_path, source_path = zephyr.generate_combined(
         loaded_schemas,
@@ -435,7 +435,8 @@ def _compile_combined_mode(
             loaded_schemas,
             docs_dir / "gatt_services.html",
             diffs=diffs if enable_diff else None,
-            changelogs=changelogs if enable_diff else None
+            changelogs=changelogs if enable_diff else None,
+            unreleased=changes_detected,
         )
         click.echo(f"Generated: {docs_path}")
 
@@ -495,6 +496,8 @@ def _compile_per_service_mode(
                 changes_detected = True
                 click.echo(f"\n{diff.service_name}: Changes detected since last snapshot")
                 click.echo(diff.to_changelog_text())
+            elif diff is None and enable_diff:
+                changes_detected = True  # no snapshot = never released
 
             # Collect for combined docs
             if docs_combined and generate_docs:
@@ -503,7 +506,6 @@ def _compile_per_service_mode(
                     loaded_schemas.append(s)
                     if diff:
                         diffs[s.service.name] = diff
-                    # Load changelog for this service
                     root_dir = config.root_dir if config else Path.cwd()
                     changelogs[s.service.name] = load_changelog(s.service.name, config, root_dir)
 
@@ -523,7 +525,8 @@ def _compile_per_service_mode(
             loaded_schemas,
             docs_dir / "gatt_services.html",
             diffs=diffs if enable_diff else None,
-            changelogs=changelogs if enable_diff else None
+            changelogs=changelogs if enable_diff else None,
+            unreleased=changes_detected,
         )
         click.echo(f"Generated: {docs_path}")
 
@@ -563,7 +566,7 @@ def compile(
     Change detection:
       - Compares current schemas against stored snapshots
       - Shows changes in CLI and highlights them in generated docs
-      - Snapshot auto-updates after each compile
+      - Does NOT update snapshots or changelog (use 'gattc release' for that)
       - Use --no-diff to skip change detection
     """
     config = load_config()
@@ -771,28 +774,127 @@ def docs(schema: Optional[Path], output: Optional[Path], combined: Optional[bool
 
 
 @main.command()
-@click.argument("services", nargs=-1)
-@click.option("--all", "update_all", is_flag=True, default=True, help="Update all service snapshots (default)")
-def snapshot(services: Tuple[str, ...], update_all: bool):
-    """Manually update schema snapshots.
+@click.argument("schema", type=click.Path(exists=True, path_type=Path), required=False)
+@click.option("-m", "--message", default=None, help="Describe what changed and why")
+@click.option("--revert", is_flag=True, default=False, help="Revert the last release")
+def release(schema: Optional[Path], message: Optional[str], revert: bool):
+    """Record schema changes and regenerate documentation.
 
-    Note: Snapshots are automatically updated after each 'gattc compile'.
-    This command is useful for updating snapshots without compiling, or
-    for updating specific service snapshots only.
+    Compares current schemas against stored snapshots, records changes
+    as a changelog entry with your message, updates snapshots, and
+    regenerates HTML documentation.
+
+    The -m message should describe WHY the change was made — the tool
+    records the structural details automatically.
+
+    Use --revert to undo the last release (restores previous snapshot,
+    removes last changelog entry). Only one level of undo.
 
     Examples:
-        gattc snapshot              # Update all service snapshots
-        gattc snapshot sensor_svc   # Update specific service snapshot
-
-    Snapshots are stored in gattc/snapshots/ by default, configurable via:
-        snapshots:
-          path: "custom/path/"
+        gattc release -m "Add humidity field for v2.1 hardware"
+        gattc release -m "Remove deprecated legacy fields"
+        gattc release --revert
     """
+    import shutil
+    from .generators import docs as docs_gen
+
     config = load_config()
 
+    # --- Revert mode ---
+    if revert:
+        if not config:
+            raise click.ClickException("No gattc.yaml found.")
+
+        schema_paths = find_schemas(config)
+        if not schema_paths:
+            raise click.ClickException("No .yaml files found in configured directories")
+
+        root_dir = config.root_dir
+        reverted = 0
+
+        for schema_path in schema_paths:
+            s, errors = load_and_validate_schema(schema_path)
+            if errors:
+                continue
+
+            service_name = s.service.name
+            snapshot_path = get_snapshot_path(service_name, config, root_dir)
+            prev_path = snapshot_path.with_suffix(".prev.json")
+
+            if prev_path.exists():
+                prev_path.replace(snapshot_path)
+            elif snapshot_path.exists():
+                snapshot_path.unlink()
+
+            entries = load_changelog(service_name, config, root_dir)
+            if entries:
+                removed = entries.pop()
+                save_changelog(service_name, entries, config, root_dir)
+                click.echo(f"{service_name}: Reverted Rev {removed['revision']}")
+                reverted += 1
+
+        if reverted == 0:
+            raise click.ClickException("No changelog entries found to revert")
+
+        click.echo(f"\nReverted {reverted} service(s)")
+
+        # Regenerate docs via compile (handles unreleased banner automatically)
+        click.echo("\nRecompiling...")
+        ctx = click.get_current_context()
+        ctx.invoke(compile, docs=True)
+        return
+
+    # --- Release mode ---
+    if not message:
+        raise click.ClickException("Missing option '-m'. Use: gattc release -m \"...\"")
+
+    def _backup_snapshot(service_name, config, root_dir):
+        """Save a .prev.json backup before overwriting the snapshot."""
+        path = get_snapshot_path(service_name, config, root_dir)
+        if path.exists():
+            shutil.copy2(path, path.with_suffix(".prev.json"))
+
+    # Single schema mode
+    if schema:
+        s, errors = load_and_validate_schema(schema)
+        if errors:
+            raise click.ClickException(
+                f"Schema validation failed:\n" + "\n".join(f"  - {e}" for e in errors)
+            )
+
+        root_dir = config.root_dir if config else Path.cwd()
+        service_name = s.service.name
+
+        has_snapshot, diff = _load_diff(service_name, s, config, root_dir)
+
+        if diff and diff.has_changes:
+            changelog = add_changelog_entry(service_name, s, diff, config, root_dir, message=message)
+            click.echo(f"{service_name}: Changes recorded (Rev {changelog[-1]['revision']})")
+            click.echo(diff.to_changelog_text())
+        else:
+            changelog = load_changelog(service_name, config, root_dir)
+            if not has_snapshot:
+                click.echo(f"{service_name}: Initial snapshot created")
+            else:
+                click.echo(f"{service_name}: No changes detected")
+
+        _backup_snapshot(service_name, config, root_dir)
+        save_snapshot(service_name, s, config, root_dir)
+
+        # Regenerate docs if configured
+        docs_dir = config.output.docs.path if config else None
+        if docs_dir:
+            docs_output = docs_dir / f"{schema.stem}.html"
+            html_path = docs_gen.generate(s, docs_output, diff=diff, changelog=changelog)
+            click.echo(f"Generated: {html_path}")
+
+        return
+
+    # Project mode
     if not config:
         raise click.ClickException(
-            "No gattc.yaml found. Run 'gattc init' to create one."
+            "No schema specified and no gattc.yaml found.\n"
+            "Either provide a schema path or create gattc.yaml with 'gattc init'."
         )
 
     schema_paths = find_schemas(config)
@@ -800,37 +902,66 @@ def snapshot(services: Tuple[str, ...], update_all: bool):
         raise click.ClickException("No .yaml files found in configured directories")
 
     root_dir = config.root_dir
-
-    # Load all schemas
+    released_count = 0
     loaded_schemas = []
+    diffs: Dict[str, SchemaDiff] = {}
+    changelogs: Dict[str, List[Dict[str, Any]]] = {}
+
     for schema_path in schema_paths:
         s, errors = load_and_validate_schema(schema_path)
         if errors:
             click.echo(f"Warning: Skipping {schema_path}: validation errors", err=True)
             continue
+
+        service_name = s.service.name
         loaded_schemas.append(s)
+
+        has_snapshot, diff = _load_diff(service_name, s, config, root_dir)
+
+        if diff and diff.has_changes:
+            changelogs[service_name] = add_changelog_entry(
+                service_name, s, diff, config, root_dir, message=message
+            )
+            click.echo(f"\n{service_name}: Changes recorded (Rev {changelogs[service_name][-1]['revision']})")
+            click.echo(diff.to_changelog_text())
+            diffs[service_name] = diff
+            released_count += 1
+        else:
+            changelogs[service_name] = load_changelog(service_name, config, root_dir)
+            if not has_snapshot:
+                click.echo(f"\n{service_name}: Initial snapshot created")
+            else:
+                click.echo(f"\n{service_name}: No changes")
+
+        _backup_snapshot(service_name, config, root_dir)
+        save_snapshot(service_name, s, config, root_dir)
 
     if not loaded_schemas:
         raise click.ClickException("No valid schemas found")
 
-    # Filter by service names if specified
-    if services:
-        service_set = set(services)
-        loaded_schemas = [s for s in loaded_schemas if s.service.name in service_set]
-        if not loaded_schemas:
-            raise click.ClickException(f"No schemas found for services: {', '.join(services)}")
+    # Regenerate docs
+    docs_dir = config.output.docs.path
+    if docs_dir and loaded_schemas:
+        if config.output.docs.is_combined():
+            html_path = docs_gen.generate_combined(
+                loaded_schemas,
+                docs_dir / "gatt_services.html",
+                diffs=diffs or None,
+                changelogs=changelogs or None,
+            )
+            click.echo(f"\nGenerated: {html_path}")
+        else:
+            for s in loaded_schemas:
+                sname = s.service.name
+                html_path = docs_gen.generate(
+                    s,
+                    docs_dir / f"{sname}.html",
+                    diff=diffs.get(sname),
+                    changelog=changelogs.get(sname, []),
+                )
+                click.echo(f"Generated: {html_path}")
 
-    # Save snapshots
-    snapshot_dir = get_snapshot_dir(config, root_dir)
-    updated_count = 0
-
-    for s in loaded_schemas:
-        service_name = s.service.name
-        snapshot_path = save_snapshot(service_name, s, config, root_dir)
-        click.echo(f"Snapshot saved: {snapshot_path}")
-        updated_count += 1
-
-    click.echo(f"\nUpdated {updated_count} snapshot(s) in {snapshot_dir}")
+    click.echo(f"\nReleased {released_count} service(s) with changes")
 
 
 @main.command()

@@ -227,9 +227,10 @@
         .changelog-table th { background: var(--bg-code); text-align: left; padding: 0.4rem 0.75rem; font-weight: 600; color: var(--text-secondary); border-bottom: 2px solid var(--border-color); }
         .changelog-table td { padding: 0.35rem 0.75rem; border-bottom: 1px solid var(--border-color); vertical-align: top; }
         .changelog-table tr:hover { background: none; }
-        .changelog-table .col-revision { width: 8%; white-space: nowrap; text-align: center; }
-        .changelog-table .col-date { width: 15%; white-space: nowrap; color: var(--text-secondary); }
-        .changelog-table .col-changes { width: 75%; }
+        .changelog-table .col-revision { width: 5%; white-space: nowrap; text-align: center; }
+        .changelog-table .col-date { width: 12%; white-space: nowrap; color: var(--text-secondary); }
+        .changelog-table .col-message { width: 28%; }
+        .changelog-table .col-changes { width: 55%; }
         .changelog-changes { font-family: 'Consolas', 'Monaco', monospace; font-size: 0.9em; line-height: 1.4; margin: 0; padding: 0; }
         .changelog-changes span { display: block; white-space: pre; margin: 0; padding: 0; }
         .changelog-changes .added { color: #16a34a; }
@@ -275,6 +276,32 @@
         .nested-struct th, .nested-struct td { padding: 0.35rem 0.5rem; }
         .nested-title { font-size: 0.8em; color: var(--text-secondary); margin-bottom: 0.25rem; }
 
+        .unreleased-banner {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            z-index: 1000;
+            background: repeating-linear-gradient(-45deg, #f59e0b, #f59e0b 8px, #1e293b 8px, #1e293b 16px);
+            display: flex;
+            justify-content: center;
+            align-items: stretch;
+        }
+        .unreleased-banner span {
+            background: #1e293b;
+            color: #fff;
+            font-size: 0.7em;
+            font-weight: 600;
+            padding: 3px 16px;
+            letter-spacing: 0.03em;
+        }
+        .unreleased-banner code {
+            color: #f59e0b;
+            font-family: inherit;
+            font-size: inherit;
+        }
+        .unreleased-spacer { height: 1.25rem; }
+
         footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--border-color); color: var(--text-secondary); font-size: 0.85em; text-align: center; }
 
         .theme-toggle-container { position: absolute; bottom: 1rem; left: 0; right: 0; display: flex; justify-content: center; align-items: center; gap: 0.5rem; font-size: 0.85em; }
@@ -318,6 +345,10 @@
     </style>
 </head>
 <body>
+{%- if unreleased %}
+    <div class="unreleased-banner"><span>UNRELEASED — run &lsquo;<code>gattc release</code>&rsquo; to update this document</span></div>
+    <div class="unreleased-spacer"></div>
+{%- endif %}
     <div class="layout">
         <nav class="nav">
             <div class="theme-toggle-container">
@@ -396,6 +427,7 @@
                         <tr>
                             <th class="col-revision">Rev</th>
                             <th class="col-date">Date</th>
+                            <th class="col-message">Description</th>
                             <th class="col-changes">Changes</th>
                         </tr>
                     </thead>
@@ -404,6 +436,7 @@
                         <tr>
                             <td class="col-revision">{{ entry.revision }}</td>
                             <td class="col-date">{{ entry.timestamp[:16] }}</td>
+                            <td class="col-message">{{ entry.message|default('') }}</td>
                             <td class="col-changes"><div class="changelog-changes">{%- if entry.changes is defined %}
 {#- Old format: pre-formatted strings -#}
 {%- for change in entry.changes %}

@@ -212,7 +212,8 @@ def generate(
     schema: Schema,
     output_path: Path,
     diff: Optional[SchemaDiff] = None,
-    changelog: Optional[List[Dict[str, Any]]] = None
+    changelog: Optional[List[Dict[str, Any]]] = None,
+    unreleased: bool = False,
 ) -> Path:
     """Generate HTML documentation for a GATT service.
 
@@ -221,6 +222,7 @@ def generate(
         output_path: Path for output HTML file.
         diff: Optional diff object for change highlighting.
         changelog: Optional changelog history list.
+        unreleased: If True, shows a warning banner indicating unreleased changes.
 
     Returns:
         Path to the generated HTML file.
@@ -240,6 +242,7 @@ def generate(
         "services": [_build_docs_context(schema, diff, changelog)],
         "title": f"{schema.service.name} - GATT Service Documentation",
         "is_combined": False,
+        "unreleased": unreleased,
     }
 
     content = template.render(**context)
@@ -254,7 +257,8 @@ def generate_combined(
     schemas: List[Schema],
     output_path: Path,
     diffs: Optional[Dict[str, SchemaDiff]] = None,
-    changelogs: Optional[Dict[str, List[Dict[str, Any]]]] = None
+    changelogs: Optional[Dict[str, List[Dict[str, Any]]]] = None,
+    unreleased: bool = False,
 ) -> Path:
     """Generate combined HTML documentation for multiple GATT services.
 
@@ -263,6 +267,7 @@ def generate_combined(
         output_path: Path for output HTML file.
         diffs: Optional dict mapping service name to diff object.
         changelogs: Optional dict mapping service name to changelog history.
+        unreleased: If True, shows a warning banner indicating unreleased changes.
 
     Returns:
         Path to the generated HTML file.
@@ -289,6 +294,7 @@ def generate_combined(
         "services": services,
         "title": "GATT Services Documentation",
         "is_combined": True,
+        "unreleased": unreleased,
     }
 
     content = template.render(**context)

@@ -1,4 +1,4 @@
-"""Tests for gattc snapshot functionality."""
+"""Tests for gattc snapshot and changelog functionality."""
 
 import json
 import pytest
@@ -12,7 +12,9 @@ from gattc.snapshot import (
     snapshot_exists,
     DEFAULT_SNAPSHOT_PATH,
 )
-from gattc.schema import load_schema, Schema, Service, Characteristic
+from gattc.changelog import add_changelog_entry, load_changelog
+from gattc.diff import diff_schemas
+from gattc.schema import load_schema, Schema, Service, Characteristic, Payload, Field, TypeInfo
 from gattc.config import load_config
 
 
@@ -188,3 +190,65 @@ class TestSaveAndLoadSnapshot:
 
         loaded = load_snapshot("svc", config=None, root_dir=tmp_path)
         assert loaded["schema_version"] == "2.0"
+
+
+class TestChangelogMessage:
+    """Tests for changelog message field."""
+
+    def _make_schema(self, name="svc", uuid="12345678-1234-1234-1234-123456789abc", fields=None):
+        chars = []
+        if fields is not None:
+            chars = [Characteristic(
+                name="char1",
+                uuid="12345678-1234-1234-1234-123456789ab0",
+                properties=["read"],
+                permissions=["read"],
+                payload=Payload(fields=fields),
+            )]
+        return Schema(
+            schema_version="1.0",
+            service=Service(name=name, uuid=uuid),
+            characteristics=chars,
+        )
+
+    def test_add_entry_includes_message(self, tmp_path):
+        """Changelog entry should contain the provided message."""
+        old_schema = self._make_schema(fields=[
+            Field(name="temp", type_info=TypeInfo(base="uint8", size=1, endian="none", is_array=False), offset=0),
+        ])
+        new_schema = self._make_schema(fields=[
+            Field(name="temp", type_info=TypeInfo(base="uint16", size=2, endian="little", is_array=False), offset=0),
+        ])
+
+        save_snapshot("svc", old_schema, config=None, root_dir=tmp_path)
+        snapshot = load_snapshot("svc", config=None, root_dir=tmp_path)
+        diff = diff_schemas(snapshot, new_schema)
+
+        entries = add_changelog_entry(
+            "svc", new_schema, diff, config=None, root_dir=tmp_path,
+            message="Changed temp to uint16 for better precision",
+        )
+
+        assert len(entries) == 1
+        assert entries[0]["message"] == "Changed temp to uint16 for better precision"
+
+    def test_message_survives_json_roundtrip(self, tmp_path):
+        """Message should persist through save/load cycle."""
+        old_schema = self._make_schema(fields=[
+            Field(name="temp", type_info=TypeInfo(base="uint8", size=1, endian="none", is_array=False), offset=0),
+        ])
+        new_schema = self._make_schema(fields=[
+            Field(name="temp", type_info=TypeInfo(base="uint16", size=2, endian="little", is_array=False), offset=0),
+        ])
+
+        save_snapshot("svc", old_schema, config=None, root_dir=tmp_path)
+        snapshot = load_snapshot("svc", config=None, root_dir=tmp_path)
+        diff = diff_schemas(snapshot, new_schema)
+
+        add_changelog_entry(
+            "svc", new_schema, diff, config=None, root_dir=tmp_path,
+            message="Test roundtrip",
+        )
+
+        loaded = load_changelog("svc", config=None, root_dir=tmp_path)
+        assert loaded[0]["message"] == "Test roundtrip"

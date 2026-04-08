@@ -77,7 +77,8 @@ def add_changelog_entry(
     schema: Schema,
     diff: SchemaDiff,
     config: Optional[Any] = None,
-    root_dir: Optional[Path] = None
+    root_dir: Optional[Path] = None,
+    message: str = "",
 ) -> List[Dict[str, Any]]:
     """Add a new changelog entry if there are changes.
 
@@ -108,6 +109,7 @@ def add_changelog_entry(
     new_entry: Dict[str, Any] = {
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
         "revision": next_revision,
+        "message": message,
     }
 
     # Service-level changes
