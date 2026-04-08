@@ -250,7 +250,7 @@ class TestServiceConfigValidation:
 
     def test_validate_service_configs_valid(self, tmp_path):
         """Test validation passes when service config matches found service."""
-        from gattc.cli import _validate_service_configs
+        from gattc.config import validate_service_configs
 
         config_file = tmp_path / "gattc.yaml"
         config_file.write_text('''
@@ -267,13 +267,13 @@ services:
         config = load_config(config_file)
         found_services = {"test_service", "other_service"}
 
-        errors = _validate_service_configs(config, found_services)
+        errors = validate_service_configs(config, found_services)
 
         assert errors == []
 
     def test_validate_service_configs_invalid(self, tmp_path):
         """Test validation fails when service config doesn't match any service."""
-        from gattc.cli import _validate_service_configs
+        from gattc.config import validate_service_configs
 
         config_file = tmp_path / "gattc.yaml"
         config_file.write_text('''
@@ -290,7 +290,7 @@ services:
         config = load_config(config_file)
         found_services = {"test_service", "other_service"}
 
-        errors = _validate_service_configs(config, found_services)
+        errors = validate_service_configs(config, found_services)
 
         assert len(errors) == 1
         assert "nonexistent_service" in errors[0]
@@ -298,7 +298,7 @@ services:
 
     def test_validate_service_configs_multiple_invalid(self, tmp_path):
         """Test validation reports all invalid service configs."""
-        from gattc.cli import _validate_service_configs
+        from gattc.config import validate_service_configs
 
         config_file = tmp_path / "gattc.yaml"
         config_file.write_text('''
@@ -319,7 +319,7 @@ services:
         config = load_config(config_file)
         found_services = {"actual_service"}
 
-        errors = _validate_service_configs(config, found_services)
+        errors = validate_service_configs(config, found_services)
 
         assert len(errors) == 2
         assert any("missing_one" in e for e in errors)

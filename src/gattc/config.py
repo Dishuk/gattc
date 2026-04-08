@@ -4,7 +4,7 @@ Configuration file loading for gattc.
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Set, Union
 
 import yaml
 
@@ -273,3 +273,22 @@ def find_schemas(config: Config) -> List[Path]:
                     schemas.append(yaml_file)
 
     return sorted(schemas)
+
+
+def validate_service_configs(config: Config, found_services: Set[str]) -> List[str]:
+    """Validate that all per-service configs reference existing services.
+
+    Args:
+        config: The loaded configuration.
+        found_services: Set of service names found in schema files.
+
+    Returns:
+        List of error messages for invalid service configs.
+    """
+    errors = []
+    for service_name in config.services.keys():
+        if service_name not in found_services:
+            errors.append(
+                f"Service '{service_name}' defined in config but not found in any schema file"
+            )
+    return errors
