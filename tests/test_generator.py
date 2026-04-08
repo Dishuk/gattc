@@ -261,3 +261,152 @@ characteristics:
         # Check source includes the header correctly
         source = source_path.read_text()
         assert '#include "test_service.h"' in source
+
+
+class TestZephyrCombinedGenerator:
+    """Tests for combined-mode Zephyr code generation."""
+
+    SCHEMA_A = """
+schema_version: "1.0"
+
+service:
+  name: service_alpha
+  uuid: "11111111-1111-1111-1111-111111111111"
+
+characteristics:
+  temperature:
+    uuid: "11111111-1111-1111-1111-111111111001"
+    properties: [read, notify]
+    permissions: [read]
+    payload:
+      value: int16
+"""
+
+    SCHEMA_B = """
+schema_version: "1.0"
+
+service:
+  name: service_beta
+  uuid: "22222222-2222-2222-2222-222222222222"
+
+characteristics:
+  humidity:
+    uuid: "22222222-2222-2222-2222-222222222001"
+    properties: [read]
+    permissions: [read]
+    payload:
+      level: uint8
+"""
+
+    def _load(self, tmp_path, name, content):
+        path = tmp_path / f"{name}.yaml"
+        path.write_text(content)
+        return load_schema(path)
+
+    def test_generate_combined_basic(self, tmp_path):
+        s1 = self._load(tmp_path, "a", self.SCHEMA_A)
+        s2 = self._load(tmp_path, "b", self.SCHEMA_B)
+
+        output = tmp_path / "generated" / "combined"
+        header, source = zephyr.generate_combined([s1, s2], output_path=output)
+
+        assert header.exists()
+        assert source.exists()
+
+        h = header.read_text()
+        assert "SERVICE_ALPHA" in h
+        assert "SERVICE_BETA" in h
+        assert "temperature" in h.lower() or "TEMPERATURE" in h
+        assert "humidity" in h.lower() or "HUMIDITY" in h
+
+        s = source.read_text()
+        assert "service_alpha" in s or "SERVICE_ALPHA" in s
+        assert "service_beta" in s or "SERVICE_BETA" in s
+
+    def test_generate_combined_output_naming_default(self, tmp_path):
+        """output_name controls file naming when using header_path/source_path."""
+        s1 = self._load(tmp_path, "a", self.SCHEMA_A)
+
+        header, source = zephyr.generate_combined(
+            [s1], header_path=tmp_path / "include", source_path=tmp_path / "src",
+        )
+
+        assert header.name == "gatt_services.h"
+        assert source.name == "gatt_services.c"
+
+    def test_generate_combined_output_naming_custom(self, tmp_path):
+        s1 = self._load(tmp_path, "a", self.SCHEMA_A)
+
+        header, source = zephyr.generate_combined(
+            [s1], header_path=tmp_path / "include",
+            source_path=tmp_path / "src", output_name="my_services",
+        )
+
+        assert header.name == "my_services.h"
+        assert source.name == "my_services.c"
+
+    def test_generate_combined_separate_paths(self, tmp_path):
+        s1 = self._load(tmp_path, "a", self.SCHEMA_A)
+        s2 = self._load(tmp_path, "b", self.SCHEMA_B)
+
+        hdir = tmp_path / "include"
+        sdir = tmp_path / "src"
+
+        header, source = zephyr.generate_combined(
+            [s1, s2], header_path=hdir, source_path=sdir,
+        )
+
+        assert header.parent == hdir
+        assert source.parent == sdir
+        assert header.exists()
+        assert source.exists()
+
+    def test_generate_combined_header_guard(self, tmp_path):
+        s1 = self._load(tmp_path, "a", self.SCHEMA_A)
+
+        header, _ = zephyr.generate_combined(
+            [s1], output_path=tmp_path / "out", output_name="my_ble_services"
+        )
+
+        h = header.read_text()
+        assert "MY_BLE_SERVICES_H" in h
+
+    def test_generate_combined_multiple_characteristics(self, tmp_path):
+        yaml_multi = """
+schema_version: "1.0"
+
+service:
+  name: multi_service
+  uuid: "33333333-3333-3333-3333-333333333333"
+
+characteristics:
+  sensor_a:
+    uuid: "33333333-3333-3333-3333-333333333001"
+    properties: [read]
+    permissions: [read]
+    payload:
+      value: uint16
+  sensor_b:
+    uuid: "33333333-3333-3333-3333-333333333002"
+    properties: [read, notify]
+    permissions: [read]
+    payload:
+      reading: int32
+"""
+        s1 = self._load(tmp_path, "a", self.SCHEMA_A)
+        s2 = self._load(tmp_path, "multi", yaml_multi)
+
+        header, _ = zephyr.generate_combined([s1, s2], output_path=tmp_path / "out")
+        h = header.read_text()
+
+        assert "SERVICE_ALPHA" in h
+        assert "MULTI_SERVICE" in h
+        assert "SENSOR_A" in h
+        assert "SENSOR_B" in h
+
+    def test_generate_combined_source_includes_header(self, tmp_path):
+        s1 = self._load(tmp_path, "a", self.SCHEMA_A)
+
+        header, source = zephyr.generate_combined([s1], output_path=tmp_path / "out")
+        s = source.read_text()
+        assert f'#include "{header.name}"' in s

@@ -15,14 +15,14 @@
 <tr><td class="value-code">{{ bit.range }}</td><td class="value-name">{{ bit.name }}</td></tr>
 {%- endfor -%}
 </table>
-{%- elif field.values.type == "named" and field.values.items -%}
+{%- elif field["values"].type == "named" and field["values"]["items"] -%}
 <table class="values-table-inline">
-{%- for item in field.values.items -%}
+{%- for item in field["values"]["items"] -%}
 <tr><td class="value-code">{{ item.value }}</td><td class="value-name">{{ item.name }}</td></tr>
 {%- endfor -%}
 </table>
-{%- elif field.values.type in ["range", "text"] -%}
-{{ field.values.display }}
+{%- elif field["values"].type in ["range", "text"] -%}
+{{ field["values"].display }}
 {%- else -%}-{%- endif -%}
 {%- endmacro -%}
 
