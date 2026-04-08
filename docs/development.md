@@ -33,9 +33,13 @@ pytest --cov=gattc
 gattc/
 ├── src/gattc/
 │   ├── __init__.py         # Version
+│   ├── __main__.py         # python -m gattc entry point
 │   ├── cli.py              # CLI entry point (click)
 │   ├── schema.py           # YAML parsing and validation
 │   ├── config.py           # Project configuration (gattc.yaml)
+│   ├── snapshot.py         # Schema snapshot storage for change tracking
+│   ├── diff.py             # Schema diffing and change detection
+│   ├── changelog.py        # Release history tracking
 │   ├── generators/
 │   │   ├── __init__.py
 │   │   ├── zephyr.py       # Zephyr C code generator
@@ -46,7 +50,13 @@ gattc/
 ├── tests/
 │   ├── test_schema.py      # Schema parsing tests
 │   ├── test_generator.py   # Code generation tests
-│   └── test_config.py      # Configuration tests
+│   ├── test_config.py      # Configuration tests
+│   ├── test_docs.py        # HTML documentation tests
+│   ├── test_diff.py        # Change detection tests
+│   ├── test_snapshot.py    # Snapshot storage tests
+│   ├── test_release.py     # Release/revert flow tests
+│   ├── test_compile.py     # C compilation smoke tests
+│   └── test_cli.py         # CLI integration tests
 └── docs/                   # Documentation
 ```
 
@@ -105,7 +115,7 @@ gattc/
 
 ## Code Style
 
-- Python 3.9+
+- Python 3.10+
 - Type hints throughout
 - Dataclasses for schema objects
 - Minimal dependencies: click, pyyaml, jinja2

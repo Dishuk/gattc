@@ -157,6 +157,26 @@ services:
         header: src/bootloader/
 ```
 
+### snapshots
+
+Configuration for schema change tracking. Snapshots are JSON files that store the
+current state of each schema, used by `gattc compile` (change detection) and
+`gattc release` (changelog generation).
+
+```yaml
+snapshots:
+  path: "gattc/snapshots"    # Default location
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `path` | string | `gattc/snapshots` | Directory for snapshot and changelog JSON files |
+
+Snapshot files created per service:
+- `<service_name>.json` - Current schema snapshot
+- `<service_name>.prev.json` - Previous snapshot (for revert)
+- `<service_name>.changelog.json` - Release history
+
 ## CLI Override
 
 Command-line arguments override `gattc.yaml`:

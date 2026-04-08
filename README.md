@@ -6,7 +6,7 @@ A contract-first tool for BLE development. Define your GATT services once in YAM
 
 | Tool | Version | Purpose |
 |------|---------|---------|
-| [Python](https://www.python.org/) | >= 3.9 | Runtime |
+| [Python](https://www.python.org/) | >= 3.10 | Runtime |
 | pip | any | Package installation |
 | [Zephyr RTOS](https://zephyrproject.org/) | >= 3.5.0 | Target platform for generated C code |
 

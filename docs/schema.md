@@ -100,6 +100,8 @@ Append `_be` suffix for big-endian:
 | `int16_be` | 2 | Signed 16-bit, big-endian |
 | `uint32_be` | 4 | Unsigned 32-bit, big-endian |
 | `int32_be` | 4 | Signed 32-bit, big-endian |
+| `uint64_be` | 8 | Unsigned 64-bit, big-endian |
+| `int64_be` | 8 | Signed 64-bit, big-endian |
 
 ### Raw Bytes
 
@@ -282,8 +284,12 @@ payload:
 
 ## Validation Rules
 
-1. **UUID Format**: Must be valid 128-bit UUID
-2. **No Offset Overlap**: Fields cannot overlap in memory
-3. **No Offset Gaps**: Warning if there are unintentional gaps
-4. **Unique Names**: Field names must be unique within payload
-5. **Characteristic Names**: Must be unique within service
+1. **UUID Format**: Must be valid 128-bit UUID (`xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`)
+2. **C Identifiers**: Service names, characteristic names, field names, and bit names must be valid C identifiers (start with letter or underscore, contain only `[A-Za-z0-9_]`) and must not be C reserved keywords
+3. **No Offset Overlap**: Fields cannot overlap in memory
+4. **No Offset Gaps**: Warning if there are unintentional gaps
+5. **Unique Names**: Field names must be unique within payload
+6. **Characteristic Names**: Must be unique within service
+7. **Unique UUIDs**: Characteristic UUIDs must be unique within service
+8. **Property/Permission Consistency**: `read` property requires a read permission, `write`/`write_without_response` properties require a write permission
+9. **Bitfield Range**: Bit indices must not exceed the field's type size (e.g., max bit 7 for `uint8`, max bit 15 for `uint16`), and range start must not exceed end
