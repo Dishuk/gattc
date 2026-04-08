@@ -7,6 +7,7 @@ from typing import Dict, List, Optional, Set, Tuple, Any
 
 import click
 import yaml
+from jinja2 import TemplateError
 
 from . import __version__
 from .config import Config, find_schemas, load_config, OutputConfig
@@ -19,7 +20,9 @@ from .changelog import add_changelog_entry, load_changelog, save_changelog
 
 @click.group()
 @click.version_option(version=__version__, prog_name="gattc")
-def main():
+@click.option("--debug", is_flag=True, default=False, help="Show full tracebacks on errors")
+@click.pass_context
+def main(ctx, debug):
     """gattc - BLE GATT schema compiler for Zephyr.
 
     Compiles YAML-based GATT service definitions into Zephyr C code.
@@ -27,7 +30,28 @@ def main():
     If gattc.yaml exists in current directory, runs in project mode.
     Otherwise, requires explicit schema path.
     """
-    pass
+    ctx.ensure_object(dict)
+    ctx.obj["debug"] = debug
+
+
+def _is_debug(ctx: Optional[click.Context] = None) -> bool:
+    """Check if --debug flag is active."""
+    ctx = ctx or click.get_current_context(silent=True)
+    if ctx and ctx.obj:
+        return ctx.obj.get("debug", False)
+    return False
+
+
+def _handle_error(e: Exception, context_msg: str) -> None:
+    """Handle an error respecting --debug flag.
+
+    In debug mode, re-raises the original exception.
+    In normal mode, raises a ClickException with a user-friendly message
+    and a hint to use --debug.
+    """
+    if _is_debug():
+        raise
+    raise click.ClickException(f"{context_msg}: {e}\n  Use --debug for full traceback.")
 
 
 def _clear_directory(directory: Path, extensions: List[str]) -> int:
@@ -512,8 +536,13 @@ def _compile_per_service_mode(
             for f in generated:
                 click.echo(f"Generated: {f}")
             success_count += 1
-        except Exception as e:
+        except (yaml.YAMLError, ValueError, FileNotFoundError, TemplateError) as e:
             click.echo(f"Error compiling {schema_path}: {e}", err=True)
+        except Exception as e:
+            if _is_debug():
+                raise
+            click.echo(f"Error compiling {schema_path}: {e}", err=True)
+            click.echo("  Use --debug for full traceback.", err=True)
 
     if success_count == 0:
         raise click.ClickException("No schemas compiled successfully")
@@ -575,8 +604,10 @@ def compile(
     if schema:
         try:
             _compile_single_schema_mode(schema, output, header, source, docs, config, enable_diff=not no_diff)
-        except Exception as e:
+        except (yaml.YAMLError, ValueError, FileNotFoundError, TemplateError) as e:
             raise click.ClickException(str(e))
+        except Exception as e:
+            _handle_error(e, "Compilation failed")
         return
 
     # Project mode - requires config
@@ -629,8 +660,10 @@ def compile(
             _compile_per_service_mode(schemas, output_dir, header_dir, source_dir, docs_dir, generate_docs, docs_combined, config, enable_diff=not no_diff)
     except click.ClickException:
         raise
-    except Exception as e:
+    except (yaml.YAMLError, ValueError, FileNotFoundError, TemplateError) as e:
         raise click.ClickException(f"Compilation failed: {e}")
+    except Exception as e:
+        _handle_error(e, "Compilation failed")
 
 
 @main.command()
@@ -754,8 +787,10 @@ def docs(schema: Optional[Path], output: Optional[Path], combined: Optional[bool
             changelogs = {s.service.name: load_changelog(s.service.name, config, root_dir) for s in schemas_only}
             html_path = docs_gen.generate_combined(schemas_only, out_path, changelogs=changelogs)
             click.echo(f"Generated: {html_path}")
-        except Exception as e:
+        except (TemplateError, FileNotFoundError, ValueError) as e:
             raise click.ClickException(f"Error generating combined docs: {e}")
+        except Exception as e:
+            _handle_error(e, "Error generating combined docs")
     else:
         # Generate separate documentation files
         for schema_path, s in loaded_schemas:
@@ -769,8 +804,13 @@ def docs(schema: Optional[Path], output: Optional[Path], combined: Optional[bool
                 changelog = load_changelog(s.service.name, config, root_dir)
                 html_path = docs_gen.generate(s, out_path, changelog=changelog)
                 click.echo(f"Generated: {html_path}")
-            except Exception as e:
+            except (TemplateError, FileNotFoundError, ValueError) as e:
                 click.echo(f"Error generating docs for {schema_path}: {e}", err=True)
+            except Exception as e:
+                if _is_debug():
+                    raise
+                click.echo(f"Error generating docs for {schema_path}: {e}", err=True)
+                click.echo("  Use --debug for full traceback.", err=True)
 
 
 @main.command()

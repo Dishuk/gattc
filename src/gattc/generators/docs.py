@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional
 
 from jinja2 import Environment, PackageLoader
 
-from ..schema import Field, Payload, Schema
+from ..schema import Field, PAYLOAD_TYPES, Payload, Schema
 from ..diff import SchemaDiff
 
 
@@ -176,10 +176,7 @@ def _build_docs_context(
             "description": char.description,
             "properties": char.properties,
             "permissions": char.permissions,
-            "payload": build_payload_with_diff(char.payload, 'payload'),
-            "read_payload": build_payload_with_diff(char.read_payload, 'read_payload'),
-            "write_payload": build_payload_with_diff(char.write_payload, 'write_payload'),
-            "notify_payload": build_payload_with_diff(char.notify_payload, 'notify_payload'),
+            **{pt: build_payload_with_diff(getattr(char, pt), pt) for pt in PAYLOAD_TYPES},
             "change_status": char_status,
         }
         characteristics.append(char_data)

@@ -15,6 +15,9 @@ PAYLOAD_MODE_KEY = "_mode"
 PAYLOAD_MIN_SIZE_KEY = "_min_size"
 PAYLOAD_MAX_SIZE_KEY = "_max_size"
 
+# Payload type names (field names on Characteristic dataclass)
+PAYLOAD_TYPES = ('payload', 'read_payload', 'write_payload', 'notify_payload')
+
 # Type size mapping (base types without endianness suffix)
 BASE_TYPE_SIZES = {
     "uint8": 1,
@@ -424,7 +427,7 @@ def validate_schema(schema: Schema) -> List[str]:
             errors.append(f"Characteristic '{char.name}' has 'write_without_response' property but no write permission")
 
         # Validate payload field names are unique and bitfields are in range
-        for payload in [char.payload, char.read_payload, char.write_payload, char.notify_payload]:
+        for payload in [getattr(char, pt) for pt in PAYLOAD_TYPES]:
             if payload:
                 field_names = [f.name for f in payload.fields]
                 seen_fields = set()

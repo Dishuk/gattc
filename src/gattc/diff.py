@@ -5,7 +5,7 @@ Schema diffing and change detection for changelog generation.
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Literal, Optional, Set
 
-from .schema import Schema
+from .schema import PAYLOAD_TYPES, Schema
 from .snapshot import _schema_to_dict
 
 
@@ -394,7 +394,7 @@ def _compare_characteristics(
 
     # Compare all payload types
     offsets_changed = False
-    for payload_type in ['payload', 'read_payload', 'write_payload', 'notify_payload']:
+    for payload_type in PAYLOAD_TYPES:
         old_payload = old_char.get(payload_type)
         new_payload = new_char.get(payload_type)
         payload_field_changes, payload_offsets_changed, payload_cfg_changed = _compare_payloads(old_payload, new_payload, payload_type)
