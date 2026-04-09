@@ -704,9 +704,9 @@ def generate_combined(
     services_context = []
     for schema in schemas:
         svc_context = _build_header_context(schema)
-        # Add source context data
         source_ctx = _build_source_context(schema, resolved_header.name)
-        svc_context["characteristics"] = source_ctx["characteristics"]
+        for hdr_char, src_char in zip(svc_context["characteristics"], source_ctx["characteristics"]):
+            hdr_char.update(src_char)
         services_context.append(svc_context)
 
     header_guard = output_name.upper().replace("-", "_") + "_H"
