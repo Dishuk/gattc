@@ -162,13 +162,14 @@ class Payload:
         for f in self.fields:
             if f.type_info.is_array:
                 if isinstance(f.type_info.array_size, int):
-                    total = f.offset + f.type_info.size * f.type_info.array_size
+                    end = f.offset + f.type_info.size * f.type_info.array_size
                 else:
                     return None  # Dynamic array
             elif f.type_info.is_repeated_struct:
                 return None  # Repeated struct
             else:
-                total = f.offset + f.type_info.size
+                end = f.offset + f.type_info.size
+            total = max(total, end)
         return total
 
 
