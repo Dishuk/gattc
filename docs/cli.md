@@ -170,7 +170,7 @@ gattc release [SCHEMA] [options]
 ```
 
 Compares current schemas against stored snapshots, records changes as a
-changelog entry with your message, updates snapshots, and regenerates
+changelog entry with the provided message, updates snapshots, and regenerates
 HTML documentation.
 
 **Arguments:**
@@ -202,7 +202,7 @@ gattc release --revert
 **What happens on release:**
 1. Loads current schemas and compares against stored snapshots
 2. Detects all changes (added/removed/modified characteristics, fields, properties)
-3. Creates a changelog entry with your message and the detected changes
+3. Creates a changelog entry with the provided message and the detected changes
 4. Updates snapshots to current schema state
 5. Regenerates HTML documentation (with change highlighting if applicable)
 

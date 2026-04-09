@@ -1,6 +1,6 @@
 # gattc - GATT Compiler
 
-A contract-first tool for BLE development. Define your GATT services once in YAML, generate type-safe code for firmware.
+A contract-first tool for BLE development. Define GATT services once in YAML, generate type-safe code for firmware.
 
 ## Prerequisites
 

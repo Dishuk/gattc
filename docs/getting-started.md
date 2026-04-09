@@ -276,7 +276,7 @@ gattc release -m "Add humidity field for v2.1 hardware"
 This:
 1. Compares the current schema against the stored snapshot
 2. Detects structural changes (added/removed/modified characteristics, fields, properties)
-3. Records a changelog entry with your message and the detected changes
+3. Records a changelog entry with the provided message and the detected changes
 4. Updates the snapshot to the current state
 5. Regenerates HTML documentation
 
@@ -288,13 +288,13 @@ Use `--no-diff` to skip change detection.
 
 ### Unreleased Changes in Documentation
 
-If you run `gattc compile --docs` or `gattc docs` after modifying a schema but before running `gattc release`, the generated HTML shows an **"UNRELEASED"** banner at the top, warning that the documentation reflects changes not yet recorded.
+Running `gattc compile --docs` or `gattc docs` after modifying a schema but before running `gattc release` causes the generated HTML to show an **"UNRELEASED"** banner at the top, warning that the documentation reflects changes not yet recorded.
 
 Running `gattc release` clears the banner and adds change highlighting (green for added, red for removed) to the documentation.
 
 ### Editing the Changelog Manually
 
-The changelog is stored as plain JSON at `gattc/snapshots/<service_name>.changelog.json`. You can edit it directly — fix a typo in a release message, add context to an entry, or remove an incorrect record. The format is an array of entries (oldest first):
+The changelog is stored as plain JSON at `gattc/snapshots/<service_name>.changelog.json`. It can be edited directly — to fix a typo in a release message, add context to an entry, or remove an incorrect record. The format is an array of entries (oldest first):
 
 ```json
 [
@@ -309,7 +309,7 @@ The changelog is stored as plain JSON at `gattc/snapshots/<service_name>.changel
 ]
 ```
 
-Changes you make to the changelog are picked up by `gattc docs` and appear in the generated HTML.
+Manual changes to the changelog are picked up by `gattc docs` and appear in the generated HTML.
 
 ### Reverting a Release
 
