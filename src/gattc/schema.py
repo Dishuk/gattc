@@ -9,6 +9,8 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 import yaml
 
+from ._util import warn_unknown_keys as _warn_unknown_keys
+
 
 # Payload special keys (prefixed with _)
 PAYLOAD_MODE_KEY = "_mode"
@@ -204,6 +206,15 @@ class Schema:
     schema_revision: Optional[int] = None  # Optional user-controlled revision number
 
 
+
+# Valid keys at each schema level
+_VALID_ROOT_KEYS = {"schema_version", "service", "characteristics", "schema_revision"}
+_VALID_SERVICE_KEYS = {"name", "uuid", "description"}
+_VALID_CHAR_KEYS = {"uuid", "properties", "permissions", "description",
+                     "payload", "read_payload", "write_payload", "notify_payload"}
+_VALID_FIELD_KEYS = {"type", "offset", "description", "unit", "values", "bits"}
+
+
 def _parse_field(name: str, data: Any) -> Field:
     """Parse a field from YAML data.
 
@@ -251,6 +262,7 @@ def _parse_field(name: str, data: Any) -> Field:
 
     # Expanded syntax: field_name: {type: uint16, unit: celsius, ...}
     if isinstance(data, dict):
+        _warn_unknown_keys(data, _VALID_FIELD_KEYS, f"field '{field_name_clean}'")
         type_str = data.get("type", "uint8")
         type_info = parse_type(type_str)
 
@@ -323,6 +335,7 @@ def _parse_payload(data: Optional[Dict[str, Any]]) -> Optional[Payload]:
 
 def _parse_characteristic(name: str, data: Dict[str, Any]) -> Characteristic:
     """Parse a characteristic from YAML data."""
+    _warn_unknown_keys(data, _VALID_CHAR_KEYS, f"characteristic '{name}'")
     char = Characteristic(
         name=name,
         uuid=data["uuid"],
@@ -361,7 +374,10 @@ def load_schema(path: Union[Path, str]) -> Schema:
     with open(path, "r", encoding="utf-8") as f:
         data = yaml.safe_load(f)
 
+    _warn_unknown_keys(data, _VALID_ROOT_KEYS, f"schema '{path.name}'")
+
     service_data = data["service"]
+    _warn_unknown_keys(service_data, _VALID_SERVICE_KEYS, f"service in '{path.name}'")
     service = Service(
         name=service_data["name"],
         uuid=service_data["uuid"],

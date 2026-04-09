@@ -8,6 +8,8 @@ from typing import Dict, List, Optional, Set, Union
 
 import yaml
 
+from ._util import warn_unknown_keys as _warn_unknown_keys
+
 
 CONFIG_FILENAME = "gattc.yaml"
 
@@ -111,6 +113,7 @@ def _parse_zephyr_output(zephyr_raw: dict, root_dir: Path) -> ZephyrOutputConfig
     if not isinstance(zephyr_raw, dict):
         raise ValueError(f"'zephyr' must be a dict with 'header' and/or 'source' keys, got {type(zephyr_raw).__name__}")
 
+    _warn_unknown_keys(zephyr_raw, {"header", "source", "per_service"}, "output.zephyr")
     zephyr_config = ZephyrOutputConfig()
 
     if "header" in zephyr_raw:
@@ -142,6 +145,7 @@ def _parse_docs_output(docs_raw: Union[str, dict], root_dir: Path) -> DocsOutput
     if isinstance(docs_raw, str):
         docs_config.path = root_dir / docs_raw
     elif isinstance(docs_raw, dict):
+        _warn_unknown_keys(docs_raw, {"path", "per_service"}, "output.docs")
         if "path" in docs_raw:
             docs_config.path = root_dir / docs_raw["path"]
         if "per_service" in docs_raw:
@@ -157,6 +161,7 @@ def _parse_output_config(output_raw: dict, root_dir: Path) -> OutputConfig:
     if not isinstance(output_raw, dict):
         raise ValueError(f"'output' must be a dict, got {type(output_raw).__name__}")
 
+    _warn_unknown_keys(output_raw, {"zephyr", "docs"}, "output")
     output_config = OutputConfig()
 
     if "zephyr" in output_raw:
@@ -167,8 +172,9 @@ def _parse_output_config(output_raw: dict, root_dir: Path) -> OutputConfig:
     return output_config
 
 
-def _parse_service_config(service_raw: dict, root_dir: Path) -> ServiceConfig:
+def _parse_service_config(service_name: str, service_raw: dict, root_dir: Path) -> ServiceConfig:
     """Parse per-service configuration."""
+    _warn_unknown_keys(service_raw, {"output"}, f"services.{service_name}")
     service_config = ServiceConfig()
 
     if "output" in service_raw:
@@ -209,6 +215,9 @@ def load_config(config_path: Optional[Path] = None) -> Optional[Config]:
     if not data:
         return Config(config_path=config_path)
 
+    if isinstance(data, dict):
+        _warn_unknown_keys(data, {"schemas", "output", "docs", "services", "snapshots"}, "config")
+
     config = Config(config_path=config_path)
 
     # Parse schemas
@@ -241,7 +250,7 @@ def load_config(config_path: Optional[Path] = None) -> Optional[Config]:
             raise ValueError(f"'services' must be a dict, got {type(services_raw).__name__}")
         for service_name, service_data in services_raw.items():
             if isinstance(service_data, dict):
-                config.services[service_name] = _parse_service_config(service_data, root_dir)
+                config.services[service_name] = _parse_service_config(service_name, service_data, root_dir)
 
     # Parse snapshots configuration
     snapshots_raw = data.get("snapshots")
@@ -249,6 +258,7 @@ def load_config(config_path: Optional[Path] = None) -> Optional[Config]:
         if isinstance(snapshots_raw, str):
             config.snapshots.path = root_dir / snapshots_raw
         elif isinstance(snapshots_raw, dict):
+            _warn_unknown_keys(snapshots_raw, {"path"}, "snapshots")
             if "path" in snapshots_raw:
                 config.snapshots.path = root_dir / snapshots_raw["path"]
         else:
