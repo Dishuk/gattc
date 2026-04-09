@@ -10,7 +10,7 @@ from ..cli import _handle_error, _is_debug
 from ..config import find_schemas, load_config
 from ..schema import load_and_validate_schema
 from ..changelog import load_changelog
-from .compile import _clear_docs_output, _resolve_combined_mode
+from .compile import _clear_files, _resolve_combined_mode
 
 
 @click.command()
@@ -68,9 +68,13 @@ def docs(schema: Optional[Path], output: Optional[Path], combined: Optional[bool
     if not loaded_schemas:
         raise click.ClickException("No schemas loaded successfully")
 
-    # Clear output directory before generating
+    # Clear only the specific files that will be regenerated
     if output_path and output_path.suffix != ".html":
-        docs_cleared = _clear_docs_output(output_path)
+        if use_combined:
+            docs_to_clear = [output_path / "gatt_services.html"]
+        else:
+            docs_to_clear = [output_path / f"{sp.stem}.html" for sp, _ in loaded_schemas]
+        docs_cleared = _clear_files(docs_to_clear)
         if docs_cleared:
             click.echo(f"Cleared {docs_cleared} HTML file(s) from output directory")
 

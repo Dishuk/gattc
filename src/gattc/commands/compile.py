@@ -1,7 +1,7 @@
 """Compile command — compile GATT schemas to Zephyr C code."""
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import click
 import yaml
@@ -20,56 +20,49 @@ from ..changelog import load_changelog
 # Helpers — output clearing
 # ---------------------------------------------------------------------------
 
-def _clear_directory(directory: Path, extensions: List[str]) -> int:
-    """Clear files with specified extensions from a directory."""
-    if not directory or not directory.exists() or not directory.is_dir():
-        return 0
-
+def _clear_files(files: List[Path]) -> int:
+    """Delete specific files. Returns the number of files deleted."""
     deleted = 0
-    for ext in extensions:
-        for file_path in directory.glob(f"*{ext}"):
-            if file_path.is_file():
-                file_path.unlink()
-                deleted += 1
-
+    for file_path in files:
+        if file_path.is_file():
+            file_path.unlink()
+            deleted += 1
     return deleted
 
 
-def _clear_zephyr_output(header_dir: Optional[Path], source_dir: Optional[Path]) -> int:
-    """Clear generated C files from zephyr output directories."""
-    deleted = 0
-    dirs_to_clear: Set[Path] = set()
-    if header_dir:
-        dirs_to_clear.add(header_dir)
-    if source_dir:
-        dirs_to_clear.add(source_dir)
+def _collect_output_files(
+    names: List[str],
+    header_dir: Optional[Path],
+    source_dir: Optional[Path],
+    docs_dir: Optional[Path],
+    generate_docs: bool,
+) -> List[Path]:
+    """Build the list of files that will be generated, so only those get cleared."""
+    files: List[Path] = []
+    for name in names:
+        if header_dir:
+            files.append(header_dir / f"{name}.h")
+        if source_dir:
+            files.append(source_dir / f"{name}.c")
+            if header_dir is None:
+                files.append(source_dir / f"{name}.h")
+        if generate_docs and docs_dir:
+            files.append(docs_dir / f"{name}.html")
+    return files
 
-    for directory in dirs_to_clear:
-        deleted += _clear_directory(directory, [".h", ".c"])
 
-    return deleted
-
-
-def _clear_docs_output(docs_dir: Optional[Path]) -> int:
-    """Clear generated HTML files from docs output directory."""
-    return _clear_directory(docs_dir, [".html"])
-
-
-def _clear_output_directories(
+def _clear_output_files(
+    names: List[str],
     header_dir: Optional[Path],
     source_dir: Optional[Path],
     docs_dir: Optional[Path],
     generate_docs: bool,
 ) -> None:
-    """Clear generated files from output directories."""
-    zephyr_cleared = _clear_zephyr_output(header_dir, source_dir)
-    if zephyr_cleared:
-        click.echo(f"Cleared {zephyr_cleared} file(s) from output directory")
-
-    if generate_docs and docs_dir:
-        docs_cleared = _clear_docs_output(docs_dir)
-        if docs_cleared:
-            click.echo(f"Cleared {docs_cleared} HTML file(s) from docs directory")
+    """Clear only the files that will be regenerated."""
+    files = _collect_output_files(names, header_dir, source_dir, docs_dir, generate_docs)
+    cleared = _clear_files(files)
+    if cleared:
+        click.echo(f"Cleared {cleared} previously generated file(s)")
 
 
 # ---------------------------------------------------------------------------
@@ -282,7 +275,9 @@ def _compile_single_schema_mode(
     generate_docs = docs if docs is not None else False
     docs_dir = config.output.docs.path if config else None
 
-    _clear_output_directories(
+    s_preview = load_schema(schema)
+    _clear_output_files(
+        [s_preview.service.name],
         header or output_dir,
         source or output_dir,
         docs_dir,
@@ -522,8 +517,24 @@ def compile(
     docs_dir = config.output.docs.path
     docs_combined = config.output.docs.is_combined()
 
-    # Clear and generate
-    _clear_output_directories(header_dir or output_dir, source_dir or output_dir, docs_dir, generate_docs)
+    if use_combined:
+        output_names = ["gatt_services"]
+    else:
+        output_names = []
+        for sp in schema_paths:
+            try:
+                s_preview = load_schema(sp)
+                output_names.append(s_preview.service.name)
+            except Exception:
+                output_names.append(sp.stem)
+
+    _clear_output_files(
+        output_names,
+        header_dir or output_dir,
+        source_dir or output_dir,
+        docs_dir,
+        generate_docs,
+    )
 
     try:
         if use_combined:
