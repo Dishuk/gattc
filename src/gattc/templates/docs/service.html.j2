@@ -41,22 +41,8 @@
 {%- endif -%}
 {%- endmacro -%}
 
-{#- Macro for rendering a payload table -#}
-{%- macro render_payload(payload, title) -%}
-{%- if payload and payload.fields %}
-                    <div class="payload-section">
-                        <div class="payload-title">{{ title }}{% if payload.size %} ({{ payload.size }} bytes){% elif payload.is_variable %} (variable length){% endif %}</div>
-                        <table>
-                            <tr>
-                                <th>Name</th>
-                                <th>Offset</th>
-                                <th>Length</th>
-                                <th>Type</th>
-                                <th>Description</th>
-                                <th>Value</th>
-                                <th>Units</th>
-                            </tr>
-{%- for field in payload.fields %}
+{#- Macro for rendering a single field row -#}
+{%- macro render_field_row(field) -%}
                             <tr class="{{ row_change_class(field) }}">
                                 <td class="field-name">{{ field.name }}{{ field_change_badge(field) }}</td>
                                 <td class="field-offset">{{ field.offset }}</td>
@@ -66,31 +52,39 @@
                                 <td class="field-value">{{ render_value_cell(field) }}</td>
                                 <td class="field-unit">{{ field.unit or "-" }}</td>
                             </tr>
+{%- endmacro -%}
+
+{#- Macro for rendering table headers -#}
+{%- macro render_field_headers() -%}
+                            <tr>
+                                <th>Name</th>
+                                <th>Offset</th>
+                                <th>Length</th>
+                                <th>Type</th>
+                                <th>Description</th>
+                                <th>Value</th>
+                                <th>Units</th>
+                            </tr>
+{%- endmacro -%}
+
+{#- Macro for rendering a payload table -#}
+{%- macro render_payload(payload, title) -%}
+{%- if payload and payload.fields %}
+                    <div class="payload-section">
+                        <div class="payload-title">{{ title }}{% if payload.size %} ({{ payload.size }} bytes){% elif payload.is_variable %} (variable length){% endif %}</div>
+                        <table>
+{{ render_field_headers() }}
+{%- for field in payload.fields %}
+{{ render_field_row(field) }}
 {%- if field.nested_fields %}
                             <tr>
                                 <td colspan="7">
                                     <div class="nested-struct">
                                         <div class="nested-title">Struct:</div>
                                         <table>
-                                            <tr>
-                                                <th>Name</th>
-                                                <th>Offset</th>
-                                                <th>Length</th>
-                                                <th>Type</th>
-                                                <th>Description</th>
-                                                <th>Value</th>
-                                                <th>Units</th>
-                                            </tr>
+{{ render_field_headers() }}
 {%- for nested in field.nested_fields %}
-                                            <tr>
-                                                <td class="field-name">{{ nested.name }}</td>
-                                                <td class="field-offset">{{ nested.offset }}</td>
-                                                <td class="field-length">{{ nested.length }}</td>
-                                                <td class="field-type">{{ nested.type }}</td>
-                                                <td>{{ nested.description or "-" }}</td>
-                                                <td class="field-value">{{ render_value_cell(nested) }}</td>
-                                                <td class="field-unit">{{ nested.unit or "-" }}</td>
-                                            </tr>
+{{ render_field_row(nested) }}
 {%- endfor %}
                                         </table>
                                     </div>
@@ -328,14 +322,14 @@
         .nav-header { padding: 0.5rem 1rem 1rem; border-bottom: 1px solid var(--border-color); margin-bottom: 0.5rem; }
         .nav-header h2 { margin: 0; font-size: 1em; color: var(--primary-color); }
         .nav-section { margin-bottom: 0.5rem; }
-        .nav-service-title { font-size: 0.8em; font-weight: 600; color: var(--text-primary); padding: 0.5rem 1rem 0.25rem; margin: 0; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; }
+        .nav-service-title { font-size: 0.9em; font-weight: 600; color: var(--text-primary); padding: 0.5rem 1rem 0.25rem; margin: 0; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; }
         .nav-service-title:hover { color: var(--primary-color); }
         .nav-service-title .arrow { font-size: 0.7em; transition: transform 0.2s ease; }
         .nav-service-title.collapsed .arrow { transform: rotate(-90deg); }
         .nav-title { font-size: 0.7em; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; padding: 0.3rem 1rem 0.3rem 1.5rem; margin: 0; }
         .nav-list.collapsed { display: none; }
         .nav-link { display: block; padding: 0.3rem 1rem 0.3rem 2rem; color: var(--text-secondary); text-decoration: none; font-size: 0.8em; border-left: 3px solid transparent; transition: all 0.15s ease; }
-        .nav-link.service-link { padding-left: 1rem; font-weight: 500; color: var(--text-primary); }
+        .nav-link.service-link { padding-left: 0; font-weight: 500; color: var(--text-primary); }
         .service-section { margin-bottom: 4rem; scroll-margin-top: 1rem; }
         .service-section + .service-section { margin-top: 5rem; }
 {% else %}
@@ -556,50 +550,22 @@ Schema revision: {{ entry.schema_revision.old|default('none') }} -> {{ entry.sch
                     this.classList.toggle('collapsed');
                 });
             });
-            const navLinks = document.querySelectorAll('.nav-link:not(.service-link)');
-            // Collect all nav targets (changelogs + characteristics) and sort by position
+{% endif %}
+            const navLinks = document.querySelectorAll('.nav-link{% if is_combined %}:not(.service-link){% endif %}');
+            // Collect all nav targets and sort by position
             const allTargets = [
-                ...document.querySelectorAll('h2[id$="-changelog"]'),
+                ...document.querySelectorAll('h2[id$="service-info"], h2[id$="changelog"]'),
                 ...document.querySelectorAll('.characteristic')
             ].sort((a, b) => a.offsetTop - b.offsetTop);
             function updateActiveLink() {
                 const scrollPos = window.scrollY + 100;
-                let currentItem = '';
-                // Check all targets (changelogs and characteristics) sorted by position
-                allTargets.forEach(t => { if (scrollPos >= t.offsetTop) currentItem = t.id; });
-                // Handle bottom of page
-                if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 50) {
-                    if (allTargets.length) currentItem = allTargets[allTargets.length - 1].id;
-                }
-                navLinks.forEach(l => l.classList.toggle('active', l.getAttribute('href') === '#' + currentItem));
-            }
-{% else %}
-            const navLinks = document.querySelectorAll('.nav-link');
-            const serviceHeader = document.getElementById('service-info');
-            const changelogHeader = document.getElementById('changelog');
-            const chars = document.querySelectorAll('.characteristic');
-            function updateActiveLink() {
-                const scrollPos = window.scrollY + 100;
                 let current = '';
-                // Check service section
-                if (serviceHeader && scrollPos >= serviceHeader.offsetTop) {
-                    current = 'service-info';
-                }
-                // Check changelog section
-                if (changelogHeader && scrollPos >= changelogHeader.offsetTop) {
-                    current = 'changelog';
-                }
-                // Check characteristics
-                chars.forEach(c => {
-                    if (scrollPos >= c.offsetTop) current = c.id;
-                });
-                // Handle bottom of page
+                allTargets.forEach(t => { if (scrollPos >= t.offsetTop) current = t.id; });
                 if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 50) {
-                    if (chars.length) current = chars[chars.length - 1].id;
+                    if (allTargets.length) current = allTargets[allTargets.length - 1].id;
                 }
                 navLinks.forEach(l => l.classList.toggle('active', l.getAttribute('href') === '#' + current));
             }
-{% endif %}
             window.addEventListener('scroll', updateActiveLink);
             updateActiveLink();
         });

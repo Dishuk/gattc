@@ -205,28 +205,10 @@ def _get_jinja_env() -> Environment:
     )
 
 
-def generate(
-    schema: Schema,
-    output_path: Path,
-    diff: Optional[SchemaDiff] = None,
-    changelog: Optional[List[Dict[str, Any]]] = None,
-    unreleased: bool = False,
-) -> Path:
-    """Generate HTML documentation for a GATT service.
-
-    Args:
-        schema: The GATT schema to generate documentation from.
-        output_path: Path for output HTML file.
-        diff: Optional diff object for change highlighting.
-        changelog: Optional changelog history list.
-        unreleased: If True, shows a warning banner indicating unreleased changes.
-
-    Returns:
-        Path to the generated HTML file.
-    """
+def _render_to_file(output_path: Path, context: Dict[str, Any]) -> Path:
+    """Render the service template to an HTML file."""
     output_path = Path(output_path)
 
-    # Ensure .html extension
     if output_path.suffix != ".html":
         output_path = output_path.with_suffix(".html")
 
@@ -235,19 +217,26 @@ def generate(
     env = _get_jinja_env()
     template = env.get_template("service.html.j2")
 
-    context = {
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.write(template.render(**context))
+
+    return output_path
+
+
+def generate(
+    schema: Schema,
+    output_path: Path,
+    diff: Optional[SchemaDiff] = None,
+    changelog: Optional[List[Dict[str, Any]]] = None,
+    unreleased: bool = False,
+) -> Path:
+    """Generate HTML documentation for a GATT service."""
+    return _render_to_file(output_path, {
         "services": [_build_docs_context(schema, diff, changelog)],
         "title": f"{schema.service.name} - GATT Service Documentation",
         "is_combined": False,
         "unreleased": unreleased,
-    }
-
-    content = template.render(**context)
-
-    with open(output_path, "w", encoding="utf-8") as f:
-        f.write(content)
-
-    return output_path
+    })
 
 
 def generate_combined(
@@ -257,46 +246,16 @@ def generate_combined(
     changelogs: Optional[Dict[str, List[Dict[str, Any]]]] = None,
     unreleased: bool = False,
 ) -> Path:
-    """Generate combined HTML documentation for multiple GATT services.
-
-    Args:
-        schemas: List of GATT schemas to include in documentation.
-        output_path: Path for output HTML file.
-        diffs: Optional dict mapping service name to diff object.
-        changelogs: Optional dict mapping service name to changelog history.
-        unreleased: If True, shows a warning banner indicating unreleased changes.
-
-    Returns:
-        Path to the generated HTML file.
-    """
-    output_path = Path(output_path)
-
-    # Ensure .html extension
-    if output_path.suffix != ".html":
-        output_path = output_path.with_suffix(".html")
-
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-
-    env = _get_jinja_env()
-    template = env.get_template("service.html.j2")
-
-    # Build contexts with diffs and changelogs if available
+    """Generate combined HTML documentation for multiple GATT services."""
     services = []
     for schema in schemas:
         diff = diffs.get(schema.service.name) if diffs else None
         changelog = changelogs.get(schema.service.name) if changelogs else None
         services.append(_build_docs_context(schema, diff, changelog))
 
-    context = {
+    return _render_to_file(output_path, {
         "services": services,
         "title": "GATT Services Documentation",
         "is_combined": True,
         "unreleased": unreleased,
-    }
-
-    content = template.render(**context)
-
-    with open(output_path, "w", encoding="utf-8") as f:
-        f.write(content)
-
-    return output_path
+    })
