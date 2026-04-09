@@ -523,6 +523,23 @@ def validate_schema(schema: Schema) -> List[str]:
                                         f"Bit {bit} in '{char.name}.{field.name}' "
                                         f"exceeds type size (max bit: {max_bit})"
                                     )
+                        # Check for overlapping bitfields
+                        seen_bits = {}
+                        for bit_spec, bit_name in field.bits.items():
+                            bit_spec_str = str(bit_spec)
+                            if "-" in bit_spec_str:
+                                start, end = map(int, bit_spec_str.split("-"))
+                                indices = range(start, end + 1)
+                            else:
+                                indices = [int(bit_spec_str)]
+                            for idx in indices:
+                                if idx in seen_bits:
+                                    errors.append(
+                                        f"Bitfield '{bit_spec}' in '{char.name}.{field.name}' "
+                                        f"overlaps with '{seen_bits[idx]}' at bit {idx}"
+                                    )
+                                else:
+                                    seen_bits[idx] = bit_spec_str
 
     return errors
 

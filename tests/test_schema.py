@@ -351,6 +351,16 @@ class TestValidateSchemaIdentifiers:
         errors = validate_schema(schema)
         assert any("Bit name" in e and "C identifier" in e for e in errors)
 
+    def test_bitfield_overlap(self):
+        schema = _make_schema(bits={"0-3": "low", "2-5": "mid"})
+        errors = validate_schema(schema)
+        assert any("overlaps" in e for e in errors)
+
+    def test_bitfield_no_overlap(self):
+        schema = _make_schema(bits={"0-3": "low", "4-7": "high"})
+        errors = validate_schema(schema)
+        assert not any("overlaps" in e for e in errors)
+
     def test_multiple_invalid_names_all_reported(self):
         schema = _make_schema(service_name="bad-svc", char_name="1char", field_name="my field")
         errors = [e for e in validate_schema(schema) if "C identifier" in e]
