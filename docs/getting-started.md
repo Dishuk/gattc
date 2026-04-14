@@ -292,32 +292,46 @@ Running `gattc compile --docs` or `gattc docs` after modifying a schema but befo
 
 Running `gattc release` clears the banner and adds change highlighting (green for added, red for removed) to the documentation.
 
-### Editing the Changelog Manually
+### Writing a Release Message
 
-The changelog is stored as plain JSON at `gattc/snapshots/<service_name>.changelog.json`. It can be edited directly — to fix a typo in a release message, add context to an entry, or remove an incorrect record. The format is an array of entries (oldest first):
+Omit `-m` and `gattc release` opens `$EDITOR` — prefilled with the detected
+structural changes as comments — so you can write a longer message, much like
+`git commit`. Save and close to record; exit with an empty message to abort.
 
-```json
-[
-  {
-    "timestamp": "2025-03-15 14:30",
-    "revision": 1,
-    "message": "Initial release",
-    "characteristics": {
-      "added": ["temperature", "config"]
-    }
-  }
-]
+### Editing the Changelog
+
+Each release is stored as a markdown file with YAML frontmatter at
+`gattc/changelog/<service_name>/NNN.md` (e.g. `001.md`, `002.md`). Example:
+
+```markdown
+---
+revision: 1
+timestamp: 2025-03-15 14:30
+characteristics:
+  added: [temperature, config]
+---
+Initial release.
 ```
 
-Manual changes to the changelog are picked up by `gattc docs` and appear in the generated HTML.
-
-### Reverting a Release
+The message is the body; the frontmatter captures the detected changes. To edit
+the latest entry interactively (omit the revision — it defaults to latest):
 
 ```bash
-gattc release --revert
+gattc changelog edit
 ```
 
-Undoes the last release: restores the previous snapshot and removes the last changelog entry. Supports one level of undo.
+Or open a specific revision by number:
+
+```bash
+gattc changelog edit 2
+```
+
+The same default applies to `gattc changelog path` — omit the revision to get
+the path to the latest entry.
+
+You can also edit the `.md` files directly. Changes are picked up by `gattc docs` and appear in the generated HTML.
+
+Use `gattc changelog` (or `gattc changelog list`) to see all revisions.
 
 ## Project Configuration
 

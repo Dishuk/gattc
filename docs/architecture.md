@@ -22,7 +22,7 @@
 3. **Diff** (if snapshots exist) - `diff.diff_schemas()` compares current schema against stored snapshot
 4. **Generate C** - `zephyr.generate()` outputs .h and .c files
 5. **Generate Docs** (optional) - `docs.generate()` outputs .html files with change highlighting
-6. **Release** (on `gattc release`) - `snapshot.save_snapshot()` stores current state, `changelog.write_entry()` records changes
+6. **Release** (on `gattc release`) - `snapshot.save_snapshot()` stores current state, `changelog.write_entry()` writes a per-revision markdown file (YAML frontmatter + author message, collected from `$EDITOR` or `-m`)
 
 ## Components
 
@@ -35,6 +35,7 @@ Click-based command-line interface:
 - `gattc check [schema]` - Validate schema without generating
 - `gattc docs [schema]` - Generate HTML documentation
 - `gattc release [schema]` - Record schema changes, update snapshots, regenerate docs
+- `gattc changelog` - List and edit recorded release entries
 
 ### Schema Parser (`schema.py`)
 
@@ -126,8 +127,9 @@ Compares old snapshot to current schema and produces structured diffs:
 
 Tracks schema changes over time:
 
-- Stores revision history with timestamps and messages
+- Stores each revision as its own markdown file (`gattc/changelog/<service>/NNN.md`) with YAML frontmatter (revision, timestamp, detected changes) and a body containing the author's release message
 - Used by `gattc release` to record changes
+- Used by `gattc changelog` to list, locate, and edit entries
 - Used by `gattc docs` to show changelog in generated HTML
 
 ### Generators (`generators/`)

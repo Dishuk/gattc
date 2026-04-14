@@ -180,23 +180,61 @@ HTML documentation.
 
 | Option | Description |
 |--------|-------------|
-| `-m, --message TEXT` | Describe what changed and why |
-| `--revert` | Revert the last release (one level of undo) |
+| `-m, --message TEXT` | Describe what changed and why. If omitted, `$EDITOR` opens (like `git commit`) prefilled with the detected changes. |
 
-The `-m` message should describe WHY the change was made — the tool records
+The message should describe WHY the change was made — the tool records
 the structural details (added/removed/modified fields, properties, etc.) automatically.
 
 **Examples:**
 
 ```bash
-# Record a release with a message
+# Record a release with an inline message
 gattc release -m "Add humidity field for v2.1 hardware"
 
-# Record removal of deprecated fields
-gattc release -m "Remove deprecated legacy fields"
+# Open $EDITOR to write a longer release note
+gattc release
+```
 
-# Undo the last release (restores previous snapshot, removes last changelog entry)
-gattc release --revert
+### changelog
+
+List and edit recorded release entries.
+
+```bash
+gattc changelog [--service NAME] [SUBCOMMAND] [REVISION]
+```
+
+Entries are stored as one markdown file per revision under
+`gattc/changelog/<service>/NNN.md` with YAML frontmatter (revision number,
+timestamp, detected structural changes) followed by the author's message.
+
+**Options:**
+
+| Option | Description |
+|--------|-------------|
+| `--service NAME` | Limit to a specific service. `list` shows every service when omitted; `path`/`edit` require a single service (so this is only needed if the project defines more than one). |
+
+**Subcommands:**
+
+| Subcommand | Description |
+|------------|-------------|
+| `list` (default) | Print all revisions with their file paths and first-line messages |
+| `path [REVISION]` | Print the absolute path to a revision file. **When `REVISION` is omitted, the latest revision is used.** |
+| `edit [REVISION]` | Open a revision file in `$EDITOR`. **When `REVISION` is omitted, the latest revision is opened.** |
+
+**Examples:**
+
+```bash
+# List all revisions for the sole service
+gattc changelog
+
+# Edit the latest revision's message
+gattc changelog edit
+
+# Edit a specific revision
+gattc changelog edit 3
+
+# Print path to revision 2 (for scripting)
+gattc changelog path 2
 ```
 
 **What happens on release:**

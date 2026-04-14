@@ -170,12 +170,13 @@ snapshots:
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `path` | string | `gattc/snapshots` | Directory for snapshot and changelog JSON files |
+| `path` | string | `gattc/snapshots` | Directory for per-service snapshot JSON files |
 
-Snapshot files created per service:
-- `<service_name>.json` - Current schema snapshot
-- `<service_name>.prev.json` - Previous snapshot (for revert)
-- `<service_name>.changelog.json` - Release history
+Files created per service:
+- `gattc/snapshots/<service_name>.json` - Current schema snapshot
+- `gattc/changelog/<service_name>/NNN.md` - One markdown file per revision (release history)
+
+The `changelog/` directory sits alongside `snapshots/` under the same parent.
 
 ## CLI Override
 

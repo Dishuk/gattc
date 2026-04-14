@@ -39,7 +39,8 @@ gattc/
 │   ├── config.py           # Project configuration (gattc.yaml)
 │   ├── snapshot.py         # Schema snapshot storage for change tracking
 │   ├── diff.py             # Schema diffing and change detection
-│   ├── changelog.py        # Release history tracking
+│   ├── changelog.py        # Release history storage (per-revision .md files)
+│   ├── commands/           # Click command implementations (release, changelog, ...)
 │   ├── generators/
 │   │   ├── __init__.py
 │   │   ├── zephyr.py       # Zephyr C code generator
@@ -54,7 +55,8 @@ gattc/
 │   ├── test_docs.py        # HTML documentation tests
 │   ├── test_diff.py        # Change detection tests
 │   ├── test_snapshot.py    # Snapshot storage tests
-│   ├── test_release.py     # Release/revert flow tests
+│   ├── test_release.py     # Release flow tests
+│   ├── test_changelog_command.py  # `gattc changelog` list/path/edit tests
 │   ├── test_compile.py     # C compilation smoke tests
 │   └── test_cli.py         # CLI integration tests
 └── docs/                   # Documentation
