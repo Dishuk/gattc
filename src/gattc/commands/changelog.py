@@ -29,7 +29,7 @@ def _discover_services(config) -> List[str]:
 
 
 def _resolve_service(service: Optional[str], config) -> str:
-    """Pick a service name; auto-selects the sole service if only one exists."""
+    """Pick a single service name; auto-selects the sole service if only one exists."""
     if service:
         return service
     services = _discover_services(config)
@@ -41,6 +41,16 @@ def _resolve_service(service: Optional[str], config) -> str:
     raise click.ClickException(f"Multiple services found ({names}); use --service to pick one.")
 
 
+def _resolve_services(service: Optional[str], config) -> List[str]:
+    """Return all services to operate on: one if --service is set, otherwise every discovered service."""
+    if service:
+        return [service]
+    services = _discover_services(config)
+    if not services:
+        raise click.ClickException("No services found. Run from a project with gattc.yaml.")
+    return services
+
+
 def _first_line(text: str) -> str:
     for line in text.splitlines():
         stripped = line.strip()
@@ -50,12 +60,32 @@ def _first_line(text: str) -> str:
 
 
 @click.group(invoke_without_command=True)
-@click.option("--service", default=None, help="Service name (required if project has multiple services).")
+@click.option(
+    "--service",
+    default=None,
+    help=(
+        "Limit to a specific service. `list` shows every service when omitted; "
+        "`path` and `edit` require a single service (so this is needed only if "
+        "the project defines more than one)."
+    ),
+)
 @click.pass_context
 def changelog(ctx, service):
     """List and edit changelog entries.
 
-    With no subcommand, prints the list of revisions.
+    Each release is stored as one markdown file per revision at
+    `gattc/changelog/<service>/NNN.md`, where NNN is the revision number.
+
+    Subcommands:
+
+    \b
+      list           Print all revisions (default when no subcommand).
+      path [REV]     Print the absolute path to revision REV's .md file.
+      edit [REV]     Open revision REV's .md file in $EDITOR.
+
+    REV is the integer revision number (e.g. `1`, `2`, ...) shown in the
+    first column of `changelog list`. For `path` and `edit`, REV is
+    optional — omit it to target the latest revision.
     """
     ctx.obj = service
     if ctx.invoked_subcommand is None:
@@ -65,34 +95,53 @@ def changelog(ctx, service):
 @changelog.command("list")
 @click.pass_context
 def list_cmd(ctx):
-    """List all changelog revisions for a service."""
+    """List changelog revisions. Shows every service unless --service is set."""
     config = load_config()
     root_dir = config.root_dir if config else Path.cwd()
-    service = _resolve_service(ctx.obj, config)
+    services = _resolve_services(ctx.obj, config)
 
-    entries = load_changelog(service, config, root_dir)
-    if not entries:
-        click.echo(f"{service}: no changelog entries.")
-        return
+    for i, service in enumerate(services):
+        if i > 0:
+            click.echo()
+        if len(services) > 1:
+            click.echo(click.style(f"{service}", bold=True, fg="cyan"))
 
-    changelog_dir = get_changelog_dir(service, config, root_dir)
-    rel_dir = _format_rel(changelog_dir, root_dir)
+        entries = load_changelog(service, config, root_dir)
+        if not entries:
+            click.echo(f"  (no changelog entries)")
+            continue
 
-    header = f"{'Rev':<5} {'File':<36} Message"
-    click.echo(header)
-    click.echo("-" * len(header))
-    for entry in entries:
-        rev = entry["revision"]
-        fname = f"{rel_dir}/{rev:03d}.md"
-        msg = _first_line(entry.get("message", ""))
-        click.echo(f"{rev:<5} {fname:<36} {msg}")
+        changelog_dir = get_changelog_dir(service, config, root_dir)
+        rel_dir = _format_rel(changelog_dir, root_dir)
+
+        rows = [
+            (
+                str(entry["revision"]),
+                f"{rel_dir}/{entry['revision']:03d}.md",
+                _first_line(entry.get("message", "")),
+            )
+            for entry in entries
+        ]
+        rev_w = max(3, max(len(r[0]) for r in rows))
+        file_w = max(4, max(len(r[1]) for r in rows))
+        gap = "   "
+
+        header = f"{'Rev':<{rev_w}}{gap}{'File':<{file_w}}{gap}Message"
+        click.echo(click.style(header, bold=True))
+        click.echo(click.style("-" * len(header), dim=True))
+        for rev, fname, msg in rows:
+            click.echo(f"{rev:<{rev_w}}{gap}{fname:<{file_w}}{gap}{msg}")
 
 
 @changelog.command("path")
 @click.argument("revision", type=int, required=False)
 @click.pass_context
 def path_cmd(ctx, revision):
-    """Print the absolute path to a revision file (latest if unspecified)."""
+    """Print the absolute path to a revision file.
+
+    REVISION is the integer revision number. If omitted, the latest revision
+    is used.
+    """
     config = load_config()
     root_dir = config.root_dir if config else Path.cwd()
     service = _resolve_service(ctx.obj, config)
@@ -105,7 +154,11 @@ def path_cmd(ctx, revision):
 @click.argument("revision", type=int, required=False)
 @click.pass_context
 def edit_cmd(ctx, revision):
-    """Open a revision file in $EDITOR (latest if unspecified)."""
+    """Open a revision file in $EDITOR.
+
+    REVISION is the integer revision number. If omitted, the latest revision
+    is opened.
+    """
     config = load_config()
     root_dir = config.root_dir if config else Path.cwd()
     service = _resolve_service(ctx.obj, config)
