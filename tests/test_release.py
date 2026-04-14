@@ -1,6 +1,5 @@
-"""Tests for gattc release, amend, and revert commands."""
+"""Tests for gattc release command."""
 
-import json
 import pytest
 from pathlib import Path
 
@@ -8,7 +7,7 @@ from click.testing import CliRunner
 
 from gattc.cli import main
 from gattc.snapshot import get_snapshot_path, load_snapshot, save_snapshot
-from gattc.changelog import load_changelog
+from gattc.changelog import get_changelog_dir, load_changelog
 from gattc.schema import Schema, Service, Characteristic, Payload, Field, TypeInfo
 
 
@@ -27,6 +26,9 @@ characteristics:
 """
 
 
+MODIFIED_SCHEMA = MINIMAL_SCHEMA.replace("temperature: uint16", "temperature: uint32")
+
+
 @pytest.fixture
 def project_dir(tmp_path):
     """Set up a minimal gattc project in a temp directory."""
@@ -41,39 +43,92 @@ def project_dir(tmp_path):
 
 class TestRelease:
 
-    def test_release_requires_message(self, project_dir):
+    def test_initial_release_with_message_records_entry(self, project_dir):
         runner = CliRunner()
         with runner.isolated_filesystem(temp_dir=project_dir):
-            result = runner.invoke(main, ["release"], catch_exceptions=False)
-            assert result.exit_code != 0
-            assert "Missing option" in result.output or "required" in result.output.lower() or result.exit_code == 2
-
-    def test_release_creates_snapshot_and_changelog(self, project_dir):
-        runner = CliRunner()
-        with runner.isolated_filesystem(temp_dir=project_dir):
-            # First release — creates initial snapshot, no changelog (no prior baseline)
             result = runner.invoke(
-                main, ["release", "-m", "Initial release"],
+                main, ["release", "-m", "Init my service"],
                 catch_exceptions=False,
             )
             assert result.exit_code == 0
-            assert "Initial snapshot" in result.output
+            assert "Initial release recorded" in result.output
 
             snapshot = load_snapshot("test_svc", config=None, root_dir=project_dir)
             assert snapshot is not None
-            assert snapshot["service"]["name"] == "test_svc"
+
+            changelog = load_changelog("test_svc", config=None, root_dir=project_dir)
+            assert len(changelog) == 1
+            assert changelog[0]["revision"] == 1
+            assert changelog[0]["message"] == "Init my service"
+            # Initial entry has no characteristics: block (only changes, not state).
+            assert "characteristics" not in changelog[0]
+
+    def test_initial_release_editor_defaults_to_initial_schema(self, project_dir, monkeypatch):
+        """No -m on initial release → editor returns template unchanged → 'Initial schema' recorded."""
+        def fake_edit(text=None, **kw):
+            return text  # user saved without changes
+
+        monkeypatch.setattr("click.edit", fake_edit)
+        runner = CliRunner()
+        with runner.isolated_filesystem(temp_dir=project_dir):
+            result = runner.invoke(main, ["release"], catch_exceptions=False)
+            assert result.exit_code == 0
+
+            changelog = load_changelog("test_svc", config=None, root_dir=project_dir)
+            assert len(changelog) == 1
+            assert changelog[0]["message"] == "Initial schema"
+
+    def test_initial_release_editor_abort_creates_nothing(self, project_dir, monkeypatch):
+        """User wipes body → abort → no snapshot, no changelog file, no dir."""
+        def fake_edit(text=None, **kw):
+            return ""  # user cleared everything
+
+        monkeypatch.setattr("click.edit", fake_edit)
+        runner = CliRunner()
+        with runner.isolated_filesystem(temp_dir=project_dir):
+            result = runner.invoke(main, ["release"], catch_exceptions=False)
+            assert "Aborted" in result.output
+            assert load_snapshot("test_svc", config=None, root_dir=project_dir) is None
+            assert load_changelog("test_svc", config=None, root_dir=project_dir) == []
+            # No orphan empty changelog dir
+            assert not (project_dir / "gattc" / "changelog" / "test_svc").exists()
+
+    def test_initial_release_editor_true_abort_returns_none(self, project_dir, monkeypatch):
+        """click.edit returning None (editor failed / user Ctrl+C'd) → clean abort."""
+        def fake_edit(text=None, **kw):
+            return None
+
+        monkeypatch.setattr("click.edit", fake_edit)
+        runner = CliRunner()
+        with runner.isolated_filesystem(temp_dir=project_dir):
+            result = runner.invoke(main, ["release"], catch_exceptions=False)
+            assert "Aborted" in result.output
+            assert load_snapshot("test_svc", config=None, root_dir=project_dir) is None
+            assert load_changelog("test_svc", config=None, root_dir=project_dir) == []
+            assert not (project_dir / "gattc" / "changelog" / "test_svc").exists()
+
+    def test_inconsistent_state_fails_loudly(self, project_dir):
+        """If changelog has entries but no snapshot, release must refuse with a clear error."""
+        runner = CliRunner()
+        with runner.isolated_filesystem(temp_dir=project_dir):
+            runner.invoke(main, ["release", "-m", "Initial"], catch_exceptions=False)
+
+            # Simulate the old orphan bug: delete the snapshot but keep the changelog.
+            snapshot_path = get_snapshot_path("test_svc", config=None, root_dir=project_dir)
+            snapshot_path.unlink()
+
+            result = runner.invoke(main, ["release", "-m", "Another"], catch_exceptions=False)
+            assert result.exit_code != 0
+            assert "inconsistent state" in result.output.lower()
 
     def test_release_records_changes_with_message(self, project_dir):
         runner = CliRunner()
         with runner.isolated_filesystem(temp_dir=project_dir):
-            # Create initial snapshot
             runner.invoke(main, ["release", "-m", "Initial"], catch_exceptions=False)
 
-            # Modify schema
             modified = MINIMAL_SCHEMA.replace("temperature: uint16", "temperature: uint32")
             (project_dir / "gattc" / "test_svc.yaml").write_text(modified)
 
-            # Release with message
             result = runner.invoke(
                 main, ["release", "-m", "Upgraded to uint32 for precision"],
                 catch_exceptions=False,
@@ -82,17 +137,55 @@ class TestRelease:
             assert "Changes recorded" in result.output
 
             changelog = load_changelog("test_svc", config=None, root_dir=project_dir)
-            assert len(changelog) == 1
-            assert changelog[0]["message"] == "Upgraded to uint32 for precision"
+            assert len(changelog) == 2
             assert changelog[0]["revision"] == 1
+            assert changelog[0]["message"] == "Initial"
+            assert changelog[1]["revision"] == 2
+            assert changelog[1]["message"] == "Upgraded to uint32 for precision"
+
+    def test_allow_empty_records_entry_without_schema_changes(self, project_dir):
+        """--allow-empty should create a changelog entry when schema hasn't changed."""
+        runner = CliRunner()
+        with runner.isolated_filesystem(temp_dir=project_dir):
+            runner.invoke(main, ["release", "-m", "Initial"], catch_exceptions=False)
+
+            result = runner.invoke(
+                main, ["release", "--allow-empty", "-m", "Build 2.3.1 re-tag"],
+                catch_exceptions=False,
+            )
+            assert result.exit_code == 0
+            assert "Empty release recorded" in result.output
+
+            changelog = load_changelog("test_svc", config=None, root_dir=project_dir)
+            assert len(changelog) == 2
+            assert changelog[1]["revision"] == 2
+            assert changelog[1]["message"] == "Build 2.3.1 re-tag"
+            # Empty release entry has no characteristics: block.
+            assert "characteristics" not in changelog[1]
+
+    def test_allow_empty_is_noop_when_changes_exist(self, project_dir):
+        """--allow-empty with real changes still follows the normal 'changed' path."""
+        runner = CliRunner()
+        with runner.isolated_filesystem(temp_dir=project_dir):
+            runner.invoke(main, ["release", "-m", "Initial"], catch_exceptions=False)
+            (project_dir / "gattc" / "test_svc.yaml").write_text(MODIFIED_SCHEMA)
+
+            result = runner.invoke(
+                main, ["release", "--allow-empty", "-m", "Upgrade"],
+                catch_exceptions=False,
+            )
+            assert result.exit_code == 0
+            assert "Changes recorded" in result.output
+
+            changelog = load_changelog("test_svc", config=None, root_dir=project_dir)
+            assert len(changelog) == 2
+            assert "characteristics" in changelog[1]
 
     def test_release_no_changes(self, project_dir):
         runner = CliRunner()
         with runner.isolated_filesystem(temp_dir=project_dir):
-            # Create initial snapshot
             runner.invoke(main, ["release", "-m", "Initial"], catch_exceptions=False)
 
-            # Release again with no changes
             result = runner.invoke(
                 main, ["release", "-m", "Nothing changed"],
                 catch_exceptions=False,
@@ -100,44 +193,99 @@ class TestRelease:
             assert result.exit_code == 0
             assert "No changes" in result.output
 
-            # No changelog entry should exist
-            changelog = load_changelog("test_svc", config=None, root_dir=project_dir)
-            assert len(changelog) == 0
-
-
-MODIFIED_SCHEMA = MINIMAL_SCHEMA.replace("temperature: uint16", "temperature: uint32")
-
-
-class TestRevert:
-
-    def test_revert_removes_last_entry(self, project_dir):
-        runner = CliRunner()
-        with runner.isolated_filesystem(temp_dir=project_dir):
-            runner.invoke(main, ["release", "-m", "Initial"], catch_exceptions=False)
-            (project_dir / "gattc" / "test_svc.yaml").write_text(MODIFIED_SCHEMA)
-            runner.invoke(main, ["release", "-m", "Will revert"], catch_exceptions=False)
-
+            # Only the initial entry exists; the second call recorded nothing.
             changelog = load_changelog("test_svc", config=None, root_dir=project_dir)
             assert len(changelog) == 1
+            assert changelog[0]["message"] == "Initial"
 
-            result = runner.invoke(
-                main, ["release", "--revert"], catch_exceptions=False,
-            )
-            assert result.exit_code == 0
-            assert "Reverted" in result.output
 
-            changelog = load_changelog("test_svc", config=None, root_dir=project_dir)
-            assert len(changelog) == 0
+class TestChangelogFiles:
 
-    def test_revert_restores_previous_snapshot(self, project_dir):
+    def test_release_writes_md_file_with_frontmatter(self, project_dir):
         runner = CliRunner()
         with runner.isolated_filesystem(temp_dir=project_dir):
             runner.invoke(main, ["release", "-m", "Initial"], catch_exceptions=False)
-            old_snapshot = load_snapshot("test_svc", config=None, root_dir=project_dir)
-
             (project_dir / "gattc" / "test_svc.yaml").write_text(MODIFIED_SCHEMA)
-            runner.invoke(main, ["release", "-m", "Changed"], catch_exceptions=False)
+            runner.invoke(main, ["release", "-m", "Upgrade to uint32"], catch_exceptions=False)
 
-            runner.invoke(main, ["release", "--revert"], catch_exceptions=False)
-            restored = load_snapshot("test_svc", config=None, root_dir=project_dir)
-            assert restored == old_snapshot
+            changelog_dir = get_changelog_dir("test_svc", config=None, root_dir=project_dir)
+            rev_file = changelog_dir / "002.md"
+            assert rev_file.exists()
+
+            content = rev_file.read_text(encoding="utf-8")
+            assert content.startswith("---\n")
+            assert "revision: 2" in content
+            assert "Upgrade to uint32" in content
+            assert "characteristics:" in content  # this entry has diff data
+
+    def test_release_editor_aborts_on_empty_body(self, project_dir, monkeypatch):
+        """Editor flow on a real change: empty body → no new entry, old state preserved."""
+        def fake_edit(text=None, **kw):
+            return ""  # user cleared the template and saved empty
+
+        monkeypatch.setattr("click.edit", fake_edit)
+
+        runner = CliRunner()
+        with runner.isolated_filesystem(temp_dir=project_dir):
+            runner.invoke(main, ["release", "-m", "Initial"], catch_exceptions=False)
+            (project_dir / "gattc" / "test_svc.yaml").write_text(MODIFIED_SCHEMA)
+            result = runner.invoke(main, ["release"], catch_exceptions=False)
+            assert "Aborted" in result.output
+
+            entries = load_changelog("test_svc", config=None, root_dir=project_dir)
+            assert len(entries) == 1
+            assert entries[0]["message"] == "Initial"
+
+            # No orphan 002.md on disk.
+            changelog_dir = get_changelog_dir("test_svc", config=None, root_dir=project_dir)
+            assert not (changelog_dir / "002.md").exists()
+
+    def test_release_editor_records_typed_body(self, project_dir, monkeypatch):
+        """Editor flow: user saves a real message → entry recorded."""
+        def fake_edit(text=None, **kw):
+            # Strip template markers and substitute a typed message.
+            return "New feature: added unit byte.\n"
+
+        monkeypatch.setattr("click.edit", fake_edit)
+
+        runner = CliRunner()
+        with runner.isolated_filesystem(temp_dir=project_dir):
+            runner.invoke(main, ["release", "-m", "Initial"], catch_exceptions=False)
+            (project_dir / "gattc" / "test_svc.yaml").write_text(MODIFIED_SCHEMA)
+            runner.invoke(main, ["release"], catch_exceptions=False)
+
+            entries = load_changelog("test_svc", config=None, root_dir=project_dir)
+            assert len(entries) == 2
+            assert "New feature" in entries[1]["message"]
+
+    def test_initial_release_with_docs_output_regenerates(self, tmp_path):
+        """Initial entry (no 'characteristics' key) must not crash HTML docs template."""
+        schema_dir = tmp_path / "gattc"
+        schema_dir.mkdir()
+        (schema_dir / "test_svc.yaml").write_text(MINIMAL_SCHEMA)
+        (tmp_path / "gattc.yaml").write_text(
+            'schemas:\n  - "gattc/"\n'
+            'output:\n  zephyr:\n    header: "out/"\n  docs:\n    path: "docs/"\n'
+        )
+
+        runner = CliRunner()
+        with runner.isolated_filesystem(temp_dir=tmp_path):
+            result = runner.invoke(
+                main, ["release", "-m", "Initial"], catch_exceptions=False
+            )
+            assert result.exit_code == 0
+            assert "Initial release recorded" in result.output
+            # Docs file should have been generated without template errors.
+            assert any((tmp_path / "docs").glob("*.html"))
+
+    def test_no_prev_json_is_written(self, project_dir):
+        """The old .prev.json backup files should no longer exist."""
+        runner = CliRunner()
+        with runner.isolated_filesystem(temp_dir=project_dir):
+            runner.invoke(main, ["release", "-m", "Initial"], catch_exceptions=False)
+            (project_dir / "gattc" / "test_svc.yaml").write_text(MODIFIED_SCHEMA)
+            runner.invoke(main, ["release", "-m", "Bump"], catch_exceptions=False)
+
+            snapshots_dir = project_dir / "gattc" / "snapshots"
+            prev_files = list(snapshots_dir.glob("*.prev.json"))
+            assert prev_files == []

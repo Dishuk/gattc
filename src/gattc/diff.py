@@ -25,13 +25,25 @@ class CharacteristicChange:
     name: str
     change_type: Literal['added', 'removed', 'modified']
     field_changes: List[FieldChange] = field(default_factory=list)
-    property_changes: List[str] = field(default_factory=list)
     uuid_change: Optional[tuple] = None  # (old_uuid, new_uuid)
     properties_added: List[str] = field(default_factory=list)
     properties_removed: List[str] = field(default_factory=list)
+    permissions_added: List[str] = field(default_factory=list)
+    permissions_removed: List[str] = field(default_factory=list)
     offsets_changed: bool = False
     description_changed: bool = False
     payload_config_changed: bool = False
+
+    @property
+    def has_changes(self) -> bool:
+        """True if a 'modified' change carries any actual difference."""
+        return bool(
+            self.field_changes or self.uuid_change
+            or self.properties_added or self.properties_removed
+            or self.permissions_added or self.permissions_removed
+            or self.offsets_changed or self.description_changed
+            or self.payload_config_changed
+        )
 
 
 @dataclass
@@ -84,8 +96,18 @@ class SchemaDiff:
                 if char_change.payload_config_changed:
                     lines.append(f"      Payload config changed")
 
-                for prop_change in char_change.property_changes:
-                    lines.append(f"      {prop_change}")
+                if char_change.uuid_change:
+                    old_uuid, new_uuid = char_change.uuid_change
+                    lines.append(f"      UUID changed: {old_uuid} -> {new_uuid}")
+
+                if char_change.properties_added:
+                    lines.append(f"      + Properties: {', '.join(char_change.properties_added)}")
+                if char_change.properties_removed:
+                    lines.append(f"      - Properties: {', '.join(char_change.properties_removed)}")
+                if char_change.permissions_added:
+                    lines.append(f"      + Permissions: {', '.join(char_change.permissions_added)}")
+                if char_change.permissions_removed:
+                    lines.append(f"      - Permissions: {', '.join(char_change.permissions_removed)}")
 
                 for field_change in char_change.field_changes:
                     if field_change.change_type == 'added':
@@ -350,47 +372,27 @@ def _compare_characteristics(
         CharacteristicChange with all detected changes.
     """
     field_changes = []
-    property_changes = []
     description_changed = False
     payload_config_changed = False
     uuid_change = None
-    properties_added = []
-    properties_removed = []
 
-    # Compare UUID
     old_uuid = old_char.get('uuid')
     new_uuid = new_char.get('uuid')
     if old_uuid != new_uuid:
         uuid_change = (old_uuid, new_uuid)
-        property_changes.append(f"UUID changed: {old_uuid} -> {new_uuid}")
 
-    # Compare description
     if old_char.get('description') != new_char.get('description'):
         description_changed = True
 
-    # Compare properties
     old_props = set(old_char.get('properties', []))
     new_props = set(new_char.get('properties', []))
-    if old_props != new_props:
-        added_props = sorted(new_props - old_props)
-        removed_props = sorted(old_props - new_props)
-        properties_added = added_props
-        properties_removed = removed_props
-        if added_props:
-            property_changes.append(f"+ Properties: {', '.join(added_props)}")
-        if removed_props:
-            property_changes.append(f"- Properties: {', '.join(removed_props)}")
+    properties_added = sorted(new_props - old_props)
+    properties_removed = sorted(old_props - new_props)
 
-    # Compare permissions
     old_perms = set(old_char.get('permissions', []))
     new_perms = set(new_char.get('permissions', []))
-    if old_perms != new_perms:
-        added_perms = new_perms - old_perms
-        removed_perms = old_perms - new_perms
-        if added_perms:
-            property_changes.append(f"+ Permissions: {', '.join(sorted(added_perms))}")
-        if removed_perms:
-            property_changes.append(f"- Permissions: {', '.join(sorted(removed_perms))}")
+    permissions_added = sorted(new_perms - old_perms)
+    permissions_removed = sorted(old_perms - new_perms)
 
     # Compare all payload types
     offsets_changed = False
@@ -408,10 +410,11 @@ def _compare_characteristics(
         name=new_char['name'],
         change_type='modified',
         field_changes=field_changes,
-        property_changes=property_changes,
         uuid_change=uuid_change,
         properties_added=properties_added,
         properties_removed=properties_removed,
+        permissions_added=permissions_added,
+        permissions_removed=permissions_removed,
         offsets_changed=offsets_changed,
         description_changed=description_changed,
         payload_config_changed=payload_config_changed
@@ -502,9 +505,7 @@ def diff_schemas(old: Optional[Dict[str, Any]], new: Schema) -> SchemaDiff:
 
         char_change = _compare_characteristics(old_char, new_char)
 
-        if (char_change.field_changes or char_change.property_changes or
-            char_change.offsets_changed or char_change.description_changed or
-            char_change.payload_config_changed):
+        if char_change.has_changes:
             has_changes = True
             characteristic_changes.append(char_change)
 

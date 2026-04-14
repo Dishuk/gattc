@@ -51,12 +51,14 @@ from .commands.check import check  # noqa: E402
 from .commands.docs import docs  # noqa: E402
 from .commands.release import release  # noqa: E402
 from .commands.init_cmd import init  # noqa: E402
+from .commands.changelog import changelog  # noqa: E402
 
 main.add_command(compile)
 main.add_command(check)
 main.add_command(docs)
 main.add_command(release)
 main.add_command(init)
+main.add_command(changelog)
 
 
 if __name__ == "__main__":

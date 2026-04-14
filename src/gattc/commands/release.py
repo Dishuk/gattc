@@ -1,204 +1,253 @@
 """Release command — record schema changes and regenerate documentation."""
 
-import shutil
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import click
 
 from ..config import find_schemas, load_config
-from ..schema import load_and_validate_schema
-from ..snapshot import get_snapshot_path, save_snapshot
+from ..schema import Schema, load_and_validate_schema
+from ..snapshot import save_snapshot
 from ..diff import SchemaDiff
-from ..changelog import add_changelog_entry, load_changelog, save_changelog
+from ..changelog import (
+    build_frontmatter,
+    get_changelog_dir,
+    get_revision_path,
+    load_changelog,
+    next_revision,
+    write_entry,
+)
 from .compile import _load_diff, compile
+
+
+_COMMENT_LINE_RE = re.compile(r"^\s*<!--.*?-->\s*$", re.MULTILINE)
+
+
+def _strip_template_markers(body: str) -> str:
+    """Remove lines that are entirely HTML comments from an edited body."""
+    return _COMMENT_LINE_RE.sub("", body)
+
+
+def _build_template_block(service_name: str, revision: int) -> str:
+    """Render the comment header shown in the editor."""
+    return (
+        f"<!-- {service_name} rev {revision} -->\n"
+        "<!-- Lines starting with '<!--' are ignored. -->\n"
+        "<!-- Write release notes below. Empty message aborts. -->\n\n"
+    )
 
 
 @click.command()
 @click.argument("schema", type=click.Path(exists=True, path_type=Path), required=False)
-@click.option("-m", "--message", default=None, help="Describe what changed and why")
-@click.option("--revert", is_flag=True, default=False, help="Revert the last release")
-def release(schema: Optional[Path], message: Optional[str], revert: bool):
+@click.option("-m", "--message", default=None, help="Describe what changed and why. If omitted, an editor opens.")
+@click.option(
+    "--allow-empty", is_flag=True, default=False,
+    help="Record a changelog entry even if the schema is unchanged (for "
+         "infrastructure or build-process notes).",
+)
+def release(schema: Optional[Path], message: Optional[str], allow_empty: bool):
     """Record schema changes and regenerate documentation.
 
     Compares current schemas against stored snapshots, records changes
-    as a changelog entry with your message, updates snapshots, and
-    regenerates HTML documentation.
+    as a changelog entry (one markdown file per revision), updates
+    snapshots, and regenerates HTML documentation.
 
-    The -m message should describe WHY the change was made — the tool
+    The message should describe WHY the change was made — the tool
     records the structural details automatically.
 
-    Use --revert to undo the last release (restores previous snapshot,
-    removes last changelog entry). Only one level of undo.
+    If -m is omitted, an editor opens (like `git commit`) with a
+    template showing the auto-detected changes; write your message
+    there and save to record the release.
+
+    Use --allow-empty to record a release with no schema changes (e.g.
+    for infrastructure, build-process, or hardware revision notes).
 
     Examples:
         gattc release -m "Add humidity field for v2.1 hardware"
-        gattc release -m "Remove deprecated legacy fields"
-        gattc release --revert
+        gattc release                         # opens $EDITOR
+        gattc release --allow-empty -m "Build 2.3.1 re-tag"
     """
     from ..generators import docs as docs_gen
 
     config = load_config()
 
-    # --- Revert mode ---
-    if revert:
-        if not config:
-            raise click.ClickException("No gattc.yaml found.")
-
-        schema_paths = find_schemas(config)
-        if not schema_paths:
-            raise click.ClickException("No .yaml files found in configured directories")
-
-        root_dir = config.root_dir
-        reverted = 0
-
-        for schema_path in schema_paths:
-            s, errors = load_and_validate_schema(schema_path)
-            if errors:
-                continue
-
-            service_name = s.service.name
-            snapshot_path = get_snapshot_path(service_name, config, root_dir)
-            prev_path = snapshot_path.with_suffix(".prev.json")
-
-            if prev_path.exists():
-                prev_path.replace(snapshot_path)
-            elif snapshot_path.exists():
-                snapshot_path.unlink()
-
-            entries = load_changelog(service_name, config, root_dir)
-            if entries:
-                removed = entries.pop()
-                save_changelog(service_name, entries, config, root_dir)
-                click.echo(f"{service_name}: Reverted Rev {removed['revision']}")
-                reverted += 1
-
-        if reverted == 0:
-            raise click.ClickException("No changelog entries found to revert")
-
-        click.echo(f"\nReverted {reverted} service(s)")
-
-        # Regenerate docs via compile (handles unreleased banner automatically)
-        click.echo("\nRecompiling...")
-        ctx = click.get_current_context()
-        ctx.invoke(compile, docs=True)
-        return
-
-    # --- Release mode ---
-    if not message:
-        raise click.ClickException("Missing option '-m'. Use: gattc release -m \"...\"")
-
-    def _backup_snapshot(service_name, config, root_dir):
-        """Save a .prev.json backup before overwriting the snapshot."""
-        path = get_snapshot_path(service_name, config, root_dir)
-        if path.exists():
-            shutil.copy2(path, path.with_suffix(".prev.json"))
-
-    # Single schema mode
     if schema:
         s, errors = load_and_validate_schema(schema)
         if errors:
             raise click.ClickException(
                 f"Schema validation failed:\n" + "\n".join(f"  - {e}" for e in errors)
             )
-
+        schema_inputs = [(s, schema.stem)]
         root_dir = config.root_dir if config else Path.cwd()
-        service_name = s.service.name
-
-        has_snapshot, diff = _load_diff(service_name, s, config, root_dir)
-
-        if diff and diff.has_changes:
-            changelog = add_changelog_entry(service_name, s, diff, config, root_dir, message=message)
-            click.echo(f"{service_name}: Changes recorded (Rev {changelog[-1]['revision']})")
-            click.echo(diff.to_changelog_text())
-        else:
-            changelog = load_changelog(service_name, config, root_dir)
-            if not has_snapshot:
-                click.echo(f"{service_name}: Initial snapshot created")
-            else:
-                click.echo(f"{service_name}: No changes detected")
-
-        _backup_snapshot(service_name, config, root_dir)
-        save_snapshot(service_name, s, config, root_dir)
-
-        # Regenerate docs if configured
-        docs_dir = config.output.docs.path if config else None
-        if docs_dir:
-            docs_output = docs_dir / f"{schema.stem}.html"
-            html_path = docs_gen.generate(s, docs_output, diff=diff, changelog=changelog)
-            click.echo(f"Generated: {html_path}")
-
-        return
-
-    # Project mode
-    if not config:
-        raise click.ClickException(
-            "No schema specified and no gattc.yaml found.\n"
-            "Either provide a schema path or create gattc.yaml with 'gattc init'."
-        )
-
-    schema_paths = find_schemas(config)
-    if not schema_paths:
-        raise click.ClickException("No .yaml files found in configured directories")
-
-    root_dir = config.root_dir
-    released_count = 0
-    loaded_schemas = []
-    diffs: Dict[str, SchemaDiff] = {}
-    changelogs: Dict[str, List[Dict[str, Any]]] = {}
-
-    for schema_path in schema_paths:
-        s, errors = load_and_validate_schema(schema_path)
-        if errors:
-            click.echo(f"Warning: Skipping {schema_path}: validation errors", err=True)
-            continue
-
-        service_name = s.service.name
-        loaded_schemas.append(s)
-
-        has_snapshot, diff = _load_diff(service_name, s, config, root_dir)
-
-        if diff and diff.has_changes:
-            changelogs[service_name] = add_changelog_entry(
-                service_name, s, diff, config, root_dir, message=message
+    else:
+        if not config:
+            raise click.ClickException(
+                "No schema specified and no gattc.yaml found.\n"
+                "Either provide a schema path or create gattc.yaml with 'gattc init'."
             )
-            click.echo(f"\n{service_name}: Changes recorded (Rev {changelogs[service_name][-1]['revision']})")
-            click.echo(diff.to_changelog_text())
-            diffs[service_name] = diff
-            released_count += 1
-        else:
-            changelogs[service_name] = load_changelog(service_name, config, root_dir)
-            if not has_snapshot:
-                click.echo(f"\n{service_name}: Initial snapshot created")
-            else:
-                click.echo(f"\n{service_name}: No changes")
+        schema_paths = find_schemas(config)
+        if not schema_paths:
+            raise click.ClickException("No .yaml files found in configured directories")
 
-        _backup_snapshot(service_name, config, root_dir)
-        save_snapshot(service_name, s, config, root_dir)
+        root_dir = config.root_dir
+        schema_inputs = []
+        for schema_path in schema_paths:
+            s, errors = load_and_validate_schema(schema_path)
+            if errors:
+                click.echo(f"Warning: Skipping {schema_path}: validation errors", err=True)
+                continue
+            schema_inputs.append((s, schema_path.stem))
 
-    if not loaded_schemas:
-        raise click.ClickException("No valid schemas found")
+        if not schema_inputs:
+            raise click.ClickException("No valid schemas found")
 
-    # Regenerate docs
-    docs_dir = config.output.docs.path
-    if docs_dir and loaded_schemas:
-        if config.output.docs.is_combined():
+    released: List[tuple[Schema, str, Optional[SchemaDiff]]] = []
+    for s, stem in schema_inputs:
+        recorded, diff = _release_one(s, message, config, root_dir, allow_empty=allow_empty)
+        if recorded:
+            released.append((s, stem, diff))
+
+    docs_dir = config.output.docs.path if config else None
+    if docs_dir and released:
+        schemas = [s for s, _, _ in released]
+        diffs = {s.service.name: d for s, _, d in released}
+        changelogs = {
+            s.service.name: load_changelog(s.service.name, config, root_dir)
+            for s, _, _ in released
+        }
+        if config and config.output.docs.is_combined():
             html_path = docs_gen.generate_combined(
-                loaded_schemas,
+                schemas,
                 docs_dir / "gatt_services.html",
-                diffs=diffs or None,
-                changelogs=changelogs or None,
+                diffs=diffs,
+                changelogs=changelogs,
             )
             click.echo(f"\nGenerated: {html_path}")
         else:
-            for s in loaded_schemas:
-                sname = s.service.name
+            for s, stem, diff in released:
                 html_path = docs_gen.generate(
                     s,
-                    docs_dir / f"{sname}.html",
-                    diff=diffs.get(sname),
-                    changelog=changelogs.get(sname, []),
+                    docs_dir / f"{stem}.html",
+                    diff=diff,
+                    changelog=changelogs[s.service.name],
                 )
                 click.echo(f"Generated: {html_path}")
 
-    click.echo(f"\nReleased {released_count} service(s) with changes")
+    if not schema:
+        click.echo(f"\nReleased {len(released)} service(s)")
+
+
+def _release_one(
+    s: Schema,
+    message: Optional[str],
+    config: Optional[Any],
+    root_dir: Path,
+    *,
+    allow_empty: bool = False,
+) -> tuple[bool, Optional[SchemaDiff]]:
+    """Record a single service's release. Returns (recorded, diff)."""
+    service_name = s.service.name
+    has_snapshot, diff = _load_diff(service_name, s, config, root_dir)
+    existing = load_changelog(service_name, config, root_dir)
+
+    if not has_snapshot and existing:
+        raise click.ClickException(
+            f"{service_name}: inconsistent state — {len(existing)} changelog entries "
+            f"exist but no snapshot was found.\n"
+            f"A previous release likely failed or the snapshot was deleted.\n"
+            f"  To start fresh: delete gattc/changelog/{service_name}/\n"
+            f"  To reconcile:   restore gattc/snapshots/{service_name}.json from git."
+        )
+
+    if diff and diff.has_changes:
+        return _commit_release(s, message, diff, config, root_dir, is_initial=False)
+
+    if not has_snapshot:
+        return _commit_release(s, message, None, config, root_dir, is_initial=True)
+
+    if allow_empty:
+        return _commit_release(s, message, None, config, root_dir, is_initial=False)
+
+    click.echo(f"\n{service_name}: No changes")
+    return False, diff
+
+
+def _commit_release(
+    s: Schema,
+    message: Optional[str],
+    diff: Optional[SchemaDiff],
+    config: Optional[Any],
+    root_dir: Path,
+    *,
+    is_initial: bool,
+) -> tuple[bool, Optional[SchemaDiff]]:
+    """Collect body, write changelog, then save snapshot (rolling back the
+    changelog file if the snapshot write fails).
+
+    diff is None for metadata-only entries (initial release, or --allow-empty
+    on an unchanged schema). is_initial only affects the default body and the
+    output wording.
+    """
+    service_name = s.service.name
+    revision = next_revision(service_name, config, root_dir)
+    fm = build_frontmatter(diff, revision)
+    default_body = "Initial schema" if is_initial else "Update schema"
+
+    if message is None:
+        body = _collect_message_via_editor(service_name, revision, default_body)
+    else:
+        body = message.strip() or None
+
+    if body is None:
+        click.echo(f"{service_name}: Aborted (empty release notes)")
+        return False, diff
+
+    write_entry(service_name, revision, fm, body, config, root_dir)
+    try:
+        save_snapshot(service_name, s, config, root_dir)
+    except Exception:
+        get_revision_path(service_name, revision, config, root_dir).unlink(missing_ok=True)
+        _cleanup_empty_changelog_dir(service_name, config, root_dir)
+        raise
+
+    if is_initial:
+        label = "Initial release recorded"
+    elif diff is None:
+        label = "Empty release recorded"
+    else:
+        label = "Changes recorded"
+    click.echo(f"\n{service_name}: {label} (Rev {revision})")
+    if diff is not None:
+        click.echo(diff.to_changelog_text())
+    return True, diff
+
+
+def _collect_message_via_editor(
+    service_name: str,
+    revision: int,
+    default_body: str = "",
+) -> Optional[str]:
+    """Open $EDITOR on a tempfile and return the cleaned body.
+
+    Returns None if the editor aborted (non-zero exit) or the saved body is
+    empty after stripping the comment lines.
+    """
+    header = _build_template_block(service_name, revision)
+    prefill = f"{default_body}\n" if default_body else ""
+    initial = header + prefill
+
+    edited = click.edit(text=initial, require_save=True, extension=".md")
+    if edited is None:
+        return None
+
+    return _strip_template_markers(edited).strip() or None
+
+
+def _cleanup_empty_changelog_dir(
+    service_name: str, config: Optional[Any], root_dir: Path
+) -> None:
+    """Remove gattc/changelog/<service>/ if it exists and is empty."""
+    changelog_dir = get_changelog_dir(service_name, config, root_dir)
+    if changelog_dir.exists() and not any(changelog_dir.iterdir()):
+        changelog_dir.rmdir()

@@ -124,7 +124,7 @@ class TestDiffSchemas:
         assert len(diff.characteristic_changes) == 1
         assert diff.characteristic_changes[0].name == "char"
         assert diff.characteristic_changes[0].change_type == "modified"
-        assert any("write" in p for p in diff.characteristic_changes[0].property_changes)
+        assert "write" in diff.characteristic_changes[0].properties_added
 
     def test_detects_schema_version_change(self):
         """Test detection of schema version change."""
@@ -261,7 +261,7 @@ class TestSchemaDiffMethods:
                         FieldChange(name="new_field", change_type="added", new_value="uint16"),
                         FieldChange(name="old_field", change_type="removed"),
                     ],
-                    property_changes=["+ Properties: write"],
+                    properties_added=["write"],
                     offsets_changed=True
                 )
             ]

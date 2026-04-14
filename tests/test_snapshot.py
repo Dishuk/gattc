@@ -12,7 +12,7 @@ from gattc.snapshot import (
     snapshot_exists,
     DEFAULT_SNAPSHOT_PATH,
 )
-from gattc.changelog import add_changelog_entry, load_changelog
+from gattc.changelog import build_frontmatter, load_changelog, next_revision, write_entry
 from gattc.diff import diff_schemas
 from gattc.schema import load_schema, Schema, Service, Characteristic, Payload, Field, TypeInfo
 from gattc.config import load_config
@@ -224,10 +224,13 @@ class TestChangelogMessage:
         snapshot = load_snapshot("svc", config=None, root_dir=tmp_path)
         diff = diff_schemas(snapshot, new_schema)
 
-        entries = add_changelog_entry(
-            "svc", new_schema, diff, config=None, root_dir=tmp_path,
-            message="Changed temp to uint16 for better precision",
+        rev = next_revision("svc", config=None, root_dir=tmp_path)
+        write_entry(
+            "svc", rev, build_frontmatter(diff, rev),
+            "Changed temp to uint16 for better precision",
+            config=None, root_dir=tmp_path,
         )
+        entries = load_changelog("svc", config=None, root_dir=tmp_path)
 
         assert len(entries) == 1
         assert entries[0]["message"] == "Changed temp to uint16 for better precision"
@@ -245,9 +248,11 @@ class TestChangelogMessage:
         snapshot = load_snapshot("svc", config=None, root_dir=tmp_path)
         diff = diff_schemas(snapshot, new_schema)
 
-        add_changelog_entry(
-            "svc", new_schema, diff, config=None, root_dir=tmp_path,
-            message="Test roundtrip",
+        rev = next_revision("svc", config=None, root_dir=tmp_path)
+        write_entry(
+            "svc", rev, build_frontmatter(diff, rev),
+            "Test roundtrip",
+            config=None, root_dir=tmp_path,
         )
 
         loaded = load_changelog("svc", config=None, root_dir=tmp_path)

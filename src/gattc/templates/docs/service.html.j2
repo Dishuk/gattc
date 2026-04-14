@@ -449,13 +449,14 @@
 {%- if entry.schema_revision is defined %}
 Schema revision: {{ entry.schema_revision.old|default('none') }} -> {{ entry.schema_revision.new|default('none') }}
 {% endif %}
-{%- for name in entry.characteristics.added|default([]) %}
+{%- set chars = entry.characteristics|default({}) %}
+{%- for name in chars.added|default([]) %}
 <span class="added">Characteristic added: {{ name }}</span>
 {% endfor %}
-{%- for name in entry.characteristics.removed|default([]) %}
+{%- for name in chars.removed|default([]) %}
 <span class="removed">Characteristic removed: {{ name }}</span>
 {% endfor %}
-{%- for name, mods in (entry.characteristics.modified|default({}))|dictsort %}
+{%- for name, mods in (chars.modified|default({}))|dictsort %}
 <span>  Characteristic: {{ name }}</span>
 {%- if mods.uuid is defined %}
 <span class="modified">    UUID changed: {{ mods.uuid.old }} -> {{ mods.uuid.new }}</span>{% endif -%}

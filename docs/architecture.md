@@ -22,7 +22,7 @@
 3. **Diff** (if snapshots exist) - `diff.diff_schemas()` compares current schema against stored snapshot
 4. **Generate C** - `zephyr.generate()` outputs .h and .c files
 5. **Generate Docs** (optional) - `docs.generate()` outputs .html files with change highlighting
-6. **Release** (on `gattc release`) - `snapshot.save_snapshot()` stores current state, `changelog.add_changelog_entry()` records changes
+6. **Release** (on `gattc release`) - `snapshot.save_snapshot()` stores current state, `changelog.write_entry()` records changes
 
 ## Components
 
