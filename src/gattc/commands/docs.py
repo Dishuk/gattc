@@ -6,7 +6,7 @@ from typing import Optional
 import click
 from jinja2 import TemplateError
 
-from ..cli import _handle_error, _is_debug
+from .._errors import _handle_error, _is_debug
 from ..config import find_schemas, load_config
 from ..schema import load_and_validate_schema
 from ..changelog import load_changelog

@@ -2,11 +2,15 @@
 Command-line interface for gattc.
 """
 
-from typing import Optional
-
 import click
 
 from . import __version__
+from .commands.changelog import changelog
+from .commands.check import check
+from .commands.compile import compile
+from .commands.docs import docs
+from .commands.init_cmd import init
+from .commands.release import release
 
 
 @click.group()
@@ -24,34 +28,6 @@ def main(ctx, debug):
     ctx.ensure_object(dict)
     ctx.obj["debug"] = debug
 
-
-def _is_debug(ctx: Optional[click.Context] = None) -> bool:
-    """Check if --debug flag is active."""
-    ctx = ctx or click.get_current_context(silent=True)
-    if ctx and ctx.obj:
-        return ctx.obj.get("debug", False)
-    return False
-
-
-def _handle_error(e: Exception, context_msg: str) -> None:
-    """Handle an error respecting --debug flag.
-
-    In debug mode, re-raises the original exception.
-    In normal mode, raises a ClickException with a user-friendly message
-    and a hint to use --debug.
-    """
-    if _is_debug():
-        raise
-    raise click.ClickException(f"{context_msg}: {e}\n  Use --debug for full traceback.")
-
-
-# Register commands
-from .commands.compile import compile  # noqa: E402
-from .commands.check import check  # noqa: E402
-from .commands.docs import docs  # noqa: E402
-from .commands.release import release  # noqa: E402
-from .commands.init_cmd import init  # noqa: E402
-from .commands.changelog import changelog  # noqa: E402
 
 main.add_command(compile)
 main.add_command(check)

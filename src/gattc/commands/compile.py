@@ -7,7 +7,7 @@ import click
 import yaml
 from jinja2 import TemplateError
 
-from ..cli import _handle_error, _is_debug
+from .._errors import _handle_error, _is_debug
 from ..config import Config, OutputConfig, find_schemas, load_config, validate_service_configs
 from ..schema import load_and_validate_schema, load_schema, Schema
 from ..generators import zephyr
