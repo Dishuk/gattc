@@ -470,7 +470,7 @@ class TestNewChangeDetection:
         diff = diff_schemas(old_dict, new_schema)
 
         assert diff.has_changes is True
-        assert "Service name changed" in diff.service_changes
+        assert "name" in diff.service_changes
 
     def test_detects_service_uuid_changed(self):
         """Test detection of service UUID change."""
@@ -481,7 +481,7 @@ class TestNewChangeDetection:
         diff = diff_schemas(old_dict, new_schema)
 
         assert diff.has_changes is True
-        assert "Service UUID changed" in diff.service_changes
+        assert "uuid" in diff.service_changes
 
     def test_detects_service_description_changed(self):
         """Test detection of service description change."""
@@ -492,7 +492,7 @@ class TestNewChangeDetection:
         diff = diff_schemas(old_dict, new_schema)
 
         assert diff.has_changes is True
-        assert "Service description changed" in diff.service_changes
+        assert "description" in diff.service_changes
 
     def test_detects_characteristic_description_changed(self):
         """Test detection of characteristic description change."""
@@ -644,7 +644,7 @@ class TestNewChangeDetection:
         diff = SchemaDiff(
             service_name="test",
             has_changes=True,
-            service_changes=["Service description changed"],
+            service_changes=["description"],
             schema_revision_changed=True,
             old_schema_revision=1,
             new_schema_revision=2,

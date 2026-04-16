@@ -11,7 +11,20 @@ from typing import Any, Dict, List, Optional
 from jinja2 import Environment, PackageLoader
 
 from ..schema import Field, PAYLOAD_TYPES, Payload, Schema
-from ..diff import SchemaDiff
+from ..diff import SchemaDiff, SERVICE_CHANGE_LABELS, SERVICE_CHANGE_ROW_LABELS
+
+
+def _validate_changelog(changelog: Optional[List[Dict[str, Any]]]) -> None:
+    """Crash loudly on unknown service_change tags before the template silently
+    renders them as empty strings."""
+    for entry in changelog or []:
+        for tag in entry.get("service_changes", []) or []:
+            if tag not in SERVICE_CHANGE_LABELS:
+                raise ValueError(
+                    f"Unknown service_changes tag {tag!r} in revision "
+                    f"{entry.get('revision', '?')}; expected one of "
+                    f"{sorted(SERVICE_CHANGE_LABELS)}."
+                )
 
 
 def _format_type(field: Field) -> str:
@@ -144,7 +157,9 @@ def _build_payload_data(payload: Payload) -> Dict[str, Any]:
 def _build_docs_context(
     schema: Schema,
     diff: Optional[SchemaDiff] = None,
-    changelog: Optional[List[Dict[str, Any]]] = None
+    changelog: Optional[List[Dict[str, Any]]] = None,
+    svc_idx: int = 1,
+    is_combined: bool = False,
 ) -> Dict[str, Any]:
     """Build context dictionary for documentation template.
 
@@ -152,6 +167,8 @@ def _build_docs_context(
         schema: The schema to build context for.
         diff: Optional diff object for change highlighting.
         changelog: Optional list of changelog history entries.
+        svc_idx: 1-based service index (used for hierarchical table numbering).
+        is_combined: True when this service is part of a combined multi-service doc.
     """
     characteristics = []
 
@@ -195,36 +212,45 @@ def _build_docs_context(
         "has_changes": diff.has_changes if diff else False,
         "changelog": changelog or [],
     }
-    _assign_table_numbers(ctx)
+    _assign_table_numbers(ctx, svc_idx=svc_idx, is_combined=is_combined)
     return ctx
 
 
-def _assign_table_numbers(svc_ctx: Dict[str, Any]) -> None:
-    """Number each complex sub-table (bitfield / named enum / nested struct) per service.
+def _number_field(field: Dict[str, Any], prefix: str, z: "count[int]") -> None:
+    """Stamp sub-table numbers on one field, recursing into nested struct fields."""
+    if field.get("bits"):
+        field["bits_table"] = f"{prefix}.{next(z)}"
+    elif field["values"].get("type") == "named" and field["values"].get("items"):
+        field["values_table"] = f"{prefix}.{next(z)}"
+    if field.get("nested_fields"):
+        field["struct_table"] = f"{prefix}.{next(z)}"
+        for nested in field["nested_fields"]:
+            _number_field(nested, prefix, z)
 
-    Walks fields in rendering order and sets ``bits_table`` / ``values_table``
-    / ``struct_table`` on each field that expands into a detail sub-table.
-    Consumed by the Markdown template; harmless for HTML.
+
+def _assign_table_numbers(svc_ctx: Dict[str, Any], svc_idx: int, is_combined: bool) -> None:
+    """Number each sub-table (bitfield / named enum / nested struct) hierarchically.
+
+    Stamps ``bits_table`` / ``values_table`` / ``struct_table`` on each field
+    that expands into a detail sub-table. Numbering is ``X.Y.Z`` in combined
+    mode and ``Y.Z`` in single-service mode, where X=service, Y=characteristic,
+    Z=per-characteristic sub-table counter. Consumed by the Markdown template;
+    harmless for HTML.
+
+    Walk order MUST match service.md.j2 render order (main payload table
+    first, then field_detail recursion for each field). If the template
+    changes its iteration order, update this walk to match or references
+    will point to the wrong tables.
     """
-    numbers = count(1)
-
-    def visit_field(field: Dict[str, Any]) -> None:
-        if field.get("bits"):
-            field["bits_table"] = next(numbers)
-        elif field["values"].get("type") == "named" and field["values"].get("items"):
-            field["values_table"] = next(numbers)
-        if field.get("nested_fields"):
-            field["struct_table"] = next(numbers)
-            for nested in field["nested_fields"]:
-                visit_field(nested)
-
-    for char in svc_ctx["characteristics"]:
+    for char_idx, char in enumerate(svc_ctx["characteristics"], start=1):
+        z = count(1)
+        prefix = f"{svc_idx}.{char_idx}" if is_combined else f"{char_idx}"
         for pt in PAYLOAD_TYPES:
             payload = char.get(pt)
             if not payload:
                 continue
             for f in payload.get("fields", []):
-                visit_field(f)
+                _number_field(f, prefix, z)
 
 
 @lru_cache(maxsize=1)
@@ -279,11 +305,14 @@ def generate(
     fmt: Optional[str] = None,
 ) -> Path:
     """Generate documentation for a GATT service."""
+    _validate_changelog(changelog)
     return _render_to_file(output_path, {
-        "services": [_build_docs_context(schema, diff, changelog)],
+        "services": [_build_docs_context(schema, diff, changelog, svc_idx=1, is_combined=False)],
         "title": f"{schema.service.name} - GATT Service Documentation",
         "is_combined": False,
         "unreleased": unreleased,
+        "service_change_labels": SERVICE_CHANGE_LABELS,
+        "service_change_row_labels": SERVICE_CHANGE_ROW_LABELS,
     }, fmt=fmt)
 
 
@@ -297,14 +326,17 @@ def generate_combined(
 ) -> Path:
     """Generate combined documentation for multiple GATT services."""
     services = []
-    for schema in schemas:
+    for idx, schema in enumerate(schemas, start=1):
         diff = diffs.get(schema.service.name) if diffs else None
         changelog = changelogs.get(schema.service.name) if changelogs else None
-        services.append(_build_docs_context(schema, diff, changelog))
+        _validate_changelog(changelog)
+        services.append(_build_docs_context(schema, diff, changelog, svc_idx=idx, is_combined=True))
 
     return _render_to_file(output_path, {
         "services": services,
         "title": "GATT Services Documentation",
         "is_combined": True,
         "unreleased": unreleased,
+        "service_change_labels": SERVICE_CHANGE_LABELS,
+        "service_change_row_labels": SERVICE_CHANGE_ROW_LABELS,
     }, fmt=fmt)

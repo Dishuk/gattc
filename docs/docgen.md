@@ -196,4 +196,6 @@ gattc compile --docs                    # writes docs/ble/*.md
 gattc docs -f html -o docs/ble/         # writes docs/ble/*.html, leaves .md untouched
 ```
 
-Each invocation only touches files in its own format. No manual cleanup needed when switching defaults.
+Each invocation only touches files in its own format, so mixing formats in one directory is safe.
+
+**Caveat:** this also means that if you *change* the configured format (`format: md` → `format: html`), the old files from the previous format aren't removed automatically. Delete them yourself if you don't want stale copies hanging around.

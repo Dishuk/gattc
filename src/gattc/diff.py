@@ -8,6 +8,26 @@ from typing import Any, Dict, List, Literal, Optional, Set
 from .schema import PAYLOAD_TYPES, Schema
 from .snapshot import _schema_to_dict
 
+# Tags emitted in SchemaDiff.service_changes. Presentation layers look up
+# display strings through the label tables below; unknown tags should
+# surface as errors, not free text. Both label maps MUST share the same
+# keyset — enforced by tests.
+ServiceChangeTag = Literal["name", "uuid", "description"]
+
+# Long form, used by the CLI changelog output and the HTML changelog cell.
+SERVICE_CHANGE_LABELS: Dict[str, str] = {
+    "name": "Service name changed",
+    "uuid": "Service UUID changed",
+    "description": "Service description changed",
+}
+
+# Short form, used as row labels in the Markdown "Modified service" table.
+SERVICE_CHANGE_ROW_LABELS: Dict[str, str] = {
+    "name": "Name changed",
+    "uuid": "UUID changed",
+    "description": "Description updated",
+}
+
 
 @dataclass
 class FieldChange:
@@ -52,7 +72,7 @@ class SchemaDiff:
     service_name: str
     has_changes: bool
     characteristic_changes: List[CharacteristicChange] = field(default_factory=list)
-    service_changes: List[str] = field(default_factory=list)
+    service_changes: List[ServiceChangeTag] = field(default_factory=list)
     schema_version_changed: bool = False
     old_schema_version: Optional[str] = None
     new_schema_version: Optional[str] = None
@@ -80,7 +100,7 @@ class SchemaDiff:
             lines.append(f"  Schema revision: {old_rev} -> {new_rev}")
 
         for service_change in self.service_changes:
-            lines.append(f"  {service_change}")
+            lines.append(f"  {SERVICE_CHANGE_LABELS[service_change]}")
 
         for char_change in self.characteristic_changes:
             if char_change.change_type == 'added':
@@ -464,15 +484,15 @@ def diff_schemas(old: Optional[Dict[str, Any]], new: Schema) -> SchemaDiff:
     new_service = new_dict.get('service', {})
 
     if old_service.get('name') != new_service.get('name'):
-        service_changes.append("Service name changed")
+        service_changes.append("name")
         has_changes = True
 
     if old_service.get('uuid') != new_service.get('uuid'):
-        service_changes.append("Service UUID changed")
+        service_changes.append("uuid")
         has_changes = True
 
     if old_service.get('description') != new_service.get('description'):
-        service_changes.append("Service description changed")
+        service_changes.append("description")
         has_changes = True
 
     # Build characteristic maps

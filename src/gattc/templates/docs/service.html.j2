@@ -440,9 +440,9 @@
 {% endif %}
 {%- endfor %}
 {%- else %}
-{#- New format: structured data -#}
+{#- New format: structured data. service_change_labels is supplied by docs.py -#}
 {%- for change in entry.service_changes|default([]) %}
-{{ change }}
+{{ service_change_labels[change] }}
 {% endfor %}
 {%- if entry.schema_revision is defined %}
 Schema revision: {{ entry.schema_revision.old|default('none') }} -> {{ entry.schema_revision.new|default('none') }}

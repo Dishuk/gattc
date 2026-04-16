@@ -83,22 +83,13 @@
 {%- else -%}`{{ name }}`{%- endif -%}
 {%- endmacro -%}
 
-{#- Map a raw "Service X changed" string to a short row label -#}
-{%- macro _service_label(text) -%}
-{%- set t = text|lower -%}
-{%- if "description" in t -%}Description
-{%- elif "uuid" in t -%}UUID
-{%- elif "name" in t -%}Name
-{%- else -%}{{ text }}{%- endif -%}
-{%- endmacro -%}
-
-{#- Render the Change|Detail table for service-level changes (includes added/removed chars) -#}
+{#- Render the Change|Detail table for service-level changes (includes added/removed chars).
+    service_change_row_labels is supplied by docs.py. -#}
 {%- macro render_service_table(svc, svc_idx, service_changes, schema_revision, added, removed) -%}
 | Change | Detail |
 |--------|--------|
 {% for change in service_changes -%}
-{%- set label = _service_label(change) -%}
-| {{ label }} {% if label == "Description" %}updated{% else %}changed{% endif %} | — |
+| {{ service_change_row_labels[change] }} | — |
 {% endfor -%}
 {% if schema_revision is defined -%}
 | Schema revision | `{{ schema_revision.old|default('none') }}` → `{{ schema_revision.new|default('none') }}` |
