@@ -51,7 +51,7 @@ def release(schema: Optional[Path], message: Optional[str], allow_empty: bool):
 
     Compares current schemas against stored snapshots, records changes
     as a changelog entry (one markdown file per revision), updates
-    snapshots, and regenerates HTML documentation.
+    snapshots, and regenerates documentation.
 
     The message should describe WHY the change was made — the tool
     records the structural details automatically.
@@ -110,6 +110,7 @@ def release(schema: Optional[Path], message: Optional[str], allow_empty: bool):
 
     docs_dir = config.output.docs.path if config else None
     if docs_dir and released:
+        fmt = config.output.docs.format if config else "md"
         schemas = [s for s, _, _ in released]
         diffs = {s.service.name: d for s, _, d in released}
         changelogs = {
@@ -117,22 +118,24 @@ def release(schema: Optional[Path], message: Optional[str], allow_empty: bool):
             for s, _, _ in released
         }
         if config and config.output.docs.is_combined():
-            html_path = docs_gen.generate_combined(
+            doc_path = docs_gen.generate_combined(
                 schemas,
-                docs_dir / "gatt_services.html",
+                docs_dir / f"gatt_services.{fmt}",
                 diffs=diffs,
                 changelogs=changelogs,
+                fmt=fmt,
             )
-            click.echo(f"\nGenerated: {html_path}")
+            click.echo(f"\nGenerated: {doc_path}")
         else:
             for s, stem, diff in released:
-                html_path = docs_gen.generate(
+                doc_path = docs_gen.generate(
                     s,
-                    docs_dir / f"{stem}.html",
+                    docs_dir / f"{stem}.{fmt}",
                     diff=diff,
                     changelog=changelogs[s.service.name],
+                    fmt=fmt,
                 )
-                click.echo(f"Generated: {html_path}")
+                click.echo(f"Generated: {doc_path}")
 
     if not schema:
         click.echo(f"\nReleased {len(released)} service(s)")

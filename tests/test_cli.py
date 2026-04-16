@@ -89,4 +89,25 @@ def test_docs(project_dir):
             main, ["docs", str(schema), "-o", str(out)], catch_exceptions=False,
         )
         assert result.exit_code == 0
-        assert (out / "test_svc.html").exists()
+        assert (out / "test_svc.md").exists()
+
+
+def test_docs_infers_format_from_output_suffix(project_dir):
+    schema = project_dir / "gattc" / "test_svc.yaml"
+    out = project_dir / "out.html"
+    with runner.isolated_filesystem(temp_dir=project_dir):
+        result = runner.invoke(
+            main, ["docs", str(schema), "-o", str(out)], catch_exceptions=False,
+        )
+        assert result.exit_code == 0
+        assert out.is_file()
+        assert "<html" in out.read_text().lower()
+
+
+def test_docs_errors_on_format_output_suffix_conflict(project_dir):
+    schema = project_dir / "gattc" / "test_svc.yaml"
+    out = project_dir / "out.html"
+    with runner.isolated_filesystem(temp_dir=project_dir):
+        result = runner.invoke(main, ["docs", str(schema), "-o", str(out), "-f", "md"])
+        assert result.exit_code != 0
+        assert "conflicts" in result.output.lower()

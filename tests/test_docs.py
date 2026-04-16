@@ -343,7 +343,7 @@ class TestGenerate:
         schema = load_schema(schema_file)
 
         output = tmp_path / "docs" / "test_service"
-        result = docs.generate(schema, output)
+        result = docs.generate(schema, output, fmt="html")
         assert result.suffix == ".html"
         assert result.exists()
 
@@ -528,7 +528,7 @@ class TestGenerateCombined:
     def test_combined_adds_html_extension(self, tmp_path):
         schema = self._load_schema_from_yaml(tmp_path, "svc", _simple_schema_yaml())
         output = tmp_path / "docs" / "combined"
-        result = docs.generate_combined([schema], output)
+        result = docs.generate_combined([schema], output, fmt="html")
         assert result.suffix == ".html"
         assert result.exists()
 
@@ -589,3 +589,131 @@ class TestGenerateCombined:
         result = docs.generate_combined([schema], output, unreleased=True)
         html = result.read_text()
         assert "unreleased" in html.lower()
+
+
+# ---------------------------------------------------------------------------
+# Integration tests: Markdown output
+# ---------------------------------------------------------------------------
+
+_BITFIELD_SCHEMA_YAML = """
+schema_version: "1.0"
+
+service:
+  name: bit_service
+  uuid: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+
+characteristics:
+  status:
+    uuid: "aaaaaaaa-aaaa-aaaa-aaaa-000000000001"
+    properties: [read]
+    permissions: [read]
+    payload:
+      flags:
+        type: uint8
+        bits:
+          0: ready
+          1: error
+"""
+
+
+class TestGenerateMarkdown:
+    def _load(self, tmp_path, name, yaml_content):
+        path = tmp_path / f"{name}.yaml"
+        path.write_text(yaml_content)
+        return load_schema(path)
+
+    def test_basic_markdown(self, tmp_path):
+        schema = self._load(tmp_path, "test", _simple_schema_yaml())
+        output = tmp_path / "docs" / "test.md"
+        result = docs.generate(schema, output, fmt="md")
+
+        assert result.suffix == ".md"
+        assert result.exists()
+        md = result.read_text()
+        assert "# Service:" in md
+        assert "## Characteristics" in md
+        assert "|---" in md  # GFM table separator
+
+    def test_numbered_subtable(self, tmp_path):
+        schema = self._load(tmp_path, "bits", _BITFIELD_SCHEMA_YAML)
+        output = tmp_path / "docs" / "bits.md"
+        result = docs.generate(schema, output, fmt="md")
+
+        md = result.read_text()
+        assert "see Table 1" in md
+        assert "#### Table 1 —" in md
+        assert "`flags` bitfield" in md
+
+    def test_structured_changelog_entry(self, tmp_path):
+        schema = self._load(tmp_path, "test", _simple_schema_yaml())
+        changelog = [{
+            "revision": 2,
+            "timestamp": "2026-04-15 10:00",
+            "message": "Overhaul",
+            "characteristics": {
+                "added": ["device_info"],
+                "removed": ["legacy_cmd"],
+                "modified": {
+                    "temperature": {
+                        "uuid": {"old": "aaa", "new": "bbb"},
+                        "fields_removed": ["stale_field"],
+                        "fields_modified": [{"name": "value", "detail": "type uint16 -> int16"}],
+                        "offsets_changed": True,
+                    },
+                },
+            },
+        }]
+
+        output = tmp_path / "docs" / "test.md"
+        result = docs.generate(schema, output, fmt="md", changelog=changelog)
+        md = result.read_text()
+
+        assert "### Revision 2 — 2026-04-15" in md
+        # Added / removed characteristics appear as rows in the service-level table
+        assert "#### Modified service" in md
+        assert "| Characteristic added | `device_info` |" in md
+        assert "| Characteristic removed | `legacy_cmd` |" in md
+        assert "#### Modified `1. temperature`" in md
+        assert "| Change | Detail |" in md
+        assert "| UUID changed | `aaa` → `bbb` |" in md
+        assert "| Field removed | `stale_field` |" in md
+        assert "| Payload offsets changed | — |" in md
+        # Old diff fence should be gone
+        assert "```diff" not in md
+
+    def test_service_level_uuid_change_renders_as_UUID(self, tmp_path):
+        schema = self._load(tmp_path, "test", _simple_schema_yaml())
+        changelog = [{
+            "revision": 2,
+            "timestamp": "2026-04-15 10:00",
+            "message": "Rename",
+            "service_changes": ["Service UUID changed: aaa -> bbb"],
+        }]
+
+        output = tmp_path / "docs" / "test.md"
+        result = docs.generate(schema, output, fmt="md", changelog=changelog)
+        md = result.read_text()
+
+        assert "| UUID changed | — |" in md
+        assert "Uuid" not in md
+
+    def test_combined_markdown_prefixes_headings(self, tmp_path):
+        schema1 = self._load(tmp_path, "svc1", _simple_schema_yaml(
+            service_name="service_alpha",
+            service_uuid="11111111-1111-1111-1111-111111111111",
+        ))
+        schema2 = self._load(tmp_path, "svc2", _simple_schema_yaml(
+            service_name="service_beta",
+            service_uuid="22222222-2222-2222-2222-222222222222",
+        ))
+
+        output = tmp_path / "docs" / "combined.md"
+        result = docs.generate_combined([schema1, schema2], output, fmt="md")
+
+        md = result.read_text()
+        assert "# 1. service_alpha" in md
+        assert "# 2. service_beta" in md
+        assert "\n---\n" in md  # service separator
+        # Characteristics numbered as <service>.<char> in combined mode
+        assert "### 1.1 temperature" in md
+        assert "### 2.1 temperature" in md

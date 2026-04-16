@@ -1,9 +1,10 @@
 """
-HTML documentation generator for GATT schemas.
+Documentation generator for GATT schemas (HTML and Markdown).
 """
 
 from datetime import datetime
 from functools import lru_cache
+from itertools import count
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -181,7 +182,7 @@ def _build_docs_context(
         }
         characteristics.append(char_data)
 
-    return {
+    ctx = {
         "service": {
             "name": schema.service.name,
             "uuid": schema.service.uuid,
@@ -190,9 +191,40 @@ def _build_docs_context(
             "schema_revision": schema.schema_revision,
         },
         "characteristics": characteristics,
+        "char_index": {c["name"]: i for i, c in enumerate(characteristics, start=1)},
         "has_changes": diff.has_changes if diff else False,
         "changelog": changelog or [],
     }
+    _assign_table_numbers(ctx)
+    return ctx
+
+
+def _assign_table_numbers(svc_ctx: Dict[str, Any]) -> None:
+    """Number each complex sub-table (bitfield / named enum / nested struct) per service.
+
+    Walks fields in rendering order and sets ``bits_table`` / ``values_table``
+    / ``struct_table`` on each field that expands into a detail sub-table.
+    Consumed by the Markdown template; harmless for HTML.
+    """
+    numbers = count(1)
+
+    def visit_field(field: Dict[str, Any]) -> None:
+        if field.get("bits"):
+            field["bits_table"] = next(numbers)
+        elif field["values"].get("type") == "named" and field["values"].get("items"):
+            field["values_table"] = next(numbers)
+        if field.get("nested_fields"):
+            field["struct_table"] = next(numbers)
+            for nested in field["nested_fields"]:
+                visit_field(nested)
+
+    for char in svc_ctx["characteristics"]:
+        for pt in PAYLOAD_TYPES:
+            payload = char.get(pt)
+            if not payload:
+                continue
+            for f in payload.get("fields", []):
+                visit_field(f)
 
 
 @lru_cache(maxsize=1)
@@ -201,21 +233,36 @@ def _get_jinja_env() -> Environment:
     return Environment(
         loader=PackageLoader("gattc", "templates/docs"),
         keep_trailing_newline=True,
-        autoescape=True,
+        autoescape=lambda name: name and name.endswith(".html.j2"),
     )
 
 
-def _render_to_file(output_path: Path, context: Dict[str, Any]) -> Path:
-    """Render the service template to an HTML file."""
-    output_path = Path(output_path)
+_FORMATS = {
+    "html": ("service.html.j2", ".html"),
+    "md": ("service.md.j2", ".md"),
+}
+SUFFIX_TO_FORMAT = {suffix: fmt for fmt, (_, suffix) in _FORMATS.items()}
 
-    if output_path.suffix != ".html":
-        output_path = output_path.with_suffix(".html")
+
+def _render_to_file(output_path: Path, context: Dict[str, Any], fmt: Optional[str] = None) -> Path:
+    """Render the service template to a file (Markdown or HTML).
+
+    If ``fmt`` is None, inferred from the output path suffix; falls back to "md".
+    """
+    output_path = Path(output_path)
+    if fmt is None:
+        fmt = SUFFIX_TO_FORMAT.get(output_path.suffix, "md")
+    if fmt not in _FORMATS:
+        raise ValueError(f"Unknown format: {fmt!r} (expected one of {list(_FORMATS)})")
+
+    template_name, suffix = _FORMATS[fmt]
+    if output_path.suffix != suffix:
+        output_path = output_path.with_suffix(suffix)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     env = _get_jinja_env()
-    template = env.get_template("service.html.j2")
+    template = env.get_template(template_name)
 
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(template.render(**context))
@@ -229,14 +276,15 @@ def generate(
     diff: Optional[SchemaDiff] = None,
     changelog: Optional[List[Dict[str, Any]]] = None,
     unreleased: bool = False,
+    fmt: Optional[str] = None,
 ) -> Path:
-    """Generate HTML documentation for a GATT service."""
+    """Generate documentation for a GATT service."""
     return _render_to_file(output_path, {
         "services": [_build_docs_context(schema, diff, changelog)],
         "title": f"{schema.service.name} - GATT Service Documentation",
         "is_combined": False,
         "unreleased": unreleased,
-    })
+    }, fmt=fmt)
 
 
 def generate_combined(
@@ -245,8 +293,9 @@ def generate_combined(
     diffs: Optional[Dict[str, SchemaDiff]] = None,
     changelogs: Optional[Dict[str, List[Dict[str, Any]]]] = None,
     unreleased: bool = False,
+    fmt: Optional[str] = None,
 ) -> Path:
-    """Generate combined HTML documentation for multiple GATT services."""
+    """Generate combined documentation for multiple GATT services."""
     services = []
     for schema in schemas:
         diff = diffs.get(schema.service.name) if diffs else None
@@ -258,4 +307,4 @@ def generate_combined(
         "title": "GATT Services Documentation",
         "is_combined": True,
         "unreleased": unreleased,
-    })
+    }, fmt=fmt)

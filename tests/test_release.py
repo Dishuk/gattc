@@ -276,7 +276,7 @@ class TestChangelogFiles:
             assert result.exit_code == 0
             assert "Initial release recorded" in result.output
             # Docs file should have been generated without template errors.
-            assert any((tmp_path / "docs").glob("*.html"))
+            assert any((tmp_path / "docs").glob("*.md"))
 
     def test_no_prev_json_is_written(self, project_dir):
         """The old .prev.json backup files should no longer exist."""

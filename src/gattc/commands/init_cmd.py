@@ -33,11 +33,12 @@ output:
     per_service: true                 # true = one .h/.c pair per service (default)
                                       # false = all services in single gatt_services.h/.c
 
-  # HTML documentation output
+  # Documentation output
   docs:
     path: "docs/ble/"
-    per_service: false                # true = one .html per service
-                                      # false = all services in single gatt_services.html (default)
+    per_service: false                # true = one file per service
+                                      # false = all services in single gatt_services.<ext>
+    format: md                        # "md" (default) or "html"
 
 # Per-service output overrides (only applies when per_service: true)
 # Use service name (from service.name in schema) as key
