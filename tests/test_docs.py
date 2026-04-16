@@ -1,4 +1,4 @@
-"""Tests for HTML documentation generator."""
+"""Tests for the Markdown/HTML documentation generator."""
 
 import pytest
 from pathlib import Path

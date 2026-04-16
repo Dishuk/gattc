@@ -59,7 +59,7 @@ gattc compile [SCHEMA] [options]
 | `--source PATH` | Output directory for source files (.c) |
 | `--combined` | Generate all services in a single .h/.c file pair |
 | `--per-service` | Generate separate .h/.c files per service (default) |
-| `--docs / --no-docs` | Generate HTML documentation alongside C code |
+| `--docs / --no-docs` | Generate documentation (Markdown by default, HTML if configured) alongside C code |
 | `--no-diff` | Skip change detection against snapshots |
 
 **Modes:**
@@ -89,7 +89,7 @@ gattc compile --header src/include/ --source src/
 # Combined output (all services in one file pair)
 gattc compile --combined
 
-# Generate C code and HTML docs together
+# Generate C code and docs together (format comes from gattc.yaml; defaults to Markdown)
 gattc compile --docs
 ```
 
@@ -131,7 +131,7 @@ gattc check
 
 ### docs
 
-Generate HTML documentation from schema(s).
+Generate documentation from schema(s) as Markdown (default) or HTML.
 
 ```bash
 gattc docs [SCHEMA] [options]
@@ -145,14 +145,30 @@ gattc docs [SCHEMA] [options]
 | Option | Description |
 |--------|-------------|
 | `-o, --output PATH` | Output directory or file path |
-| `--combined` | Generate all services in a single HTML file |
-| `--per-service` | Generate separate HTML file per service (default) |
+| `-f, --format FMT` | Output format: `md` (default) or `html` |
+| `--combined` | Generate all services in a single file |
+| `--per-service` | Generate a separate file per service (default) |
+
+**Format resolution** (first rule wins):
+
+1. `-f / --format`
+2. Suffix of `-o` (if `.md` or `.html`)
+3. `output.docs.format` in `gattc.yaml`
+4. Fallback: `md`
+
+`-f` and a conflicting `-o` suffix (e.g. `-f md -o out.html`) produce an error.
 
 **Examples:**
 
 ```bash
-# Generate docs for single schema
+# Generate Markdown for single schema (default)
 gattc docs services/my_service.yaml -o docs/
+
+# Generate HTML (explicit flag)
+gattc docs services/my_service.yaml -o docs/ -f html
+
+# Generate HTML (inferred from file suffix)
+gattc docs services/my_service.yaml -o docs/my_service.html
 
 # Generate combined docs for all schemas in project
 gattc docs --combined
@@ -171,7 +187,7 @@ gattc release [SCHEMA] [options]
 
 Compares current schemas against stored snapshots, records changes as a
 changelog entry with the provided message, updates snapshots, and regenerates
-HTML documentation.
+documentation (in the format configured by `output.docs.format`; Markdown by default).
 
 **Arguments:**
 - `[SCHEMA]` - Path to YAML schema file (optional if `gattc.yaml` exists)
@@ -242,7 +258,7 @@ gattc changelog path 2
 2. Detects all changes (added/removed/modified characteristics, fields, properties)
 3. Creates a changelog entry with the provided message and the detected changes
 4. Updates snapshots to current schema state
-5. Regenerates HTML documentation (with change highlighting if applicable)
+5. Regenerates documentation in the configured format (with change highlighting if applicable)
 
 ## Exit Codes
 

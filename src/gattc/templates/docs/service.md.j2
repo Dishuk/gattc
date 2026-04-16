@@ -215,7 +215,7 @@
 {% if not loop.first %}---
 
 {% endif -%}
-### {% if is_combined %}{{ svc_idx }}.{{ loop.index }}{% else %}{{ loop.index }}.{% endif %} {{ name_with_status(char.name, char.change_status) }}
+### {% if is_combined %}{{ svc_idx }}.{{ svc.char_index[char.name] }}{% else %}{{ svc.char_index[char.name] }}.{% endif %} {{ name_with_status(char.name, char.change_status) }}
 
 - **UUID:** `{{ char.uuid }}`
 - **Properties:** {% for prop in char.properties %}`{{ prop }}`{% if not loop.last %}, {% endif %}{% endfor %}

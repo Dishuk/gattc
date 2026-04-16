@@ -13,7 +13,7 @@
 | Core | `diff.py` | Schema diffing and change detection |
 | Core | `changelog.py` | Release history tracking |
 | Generator | `zephyr.py` | C code output (.h, .c) |
-| Generator | `docs.py` | HTML documentation |
+| Generator | `docs.py` | Markdown/HTML documentation |
 
 ## Data Flow
 
@@ -21,7 +21,7 @@
 2. **Validate** - `schema.validate_schema()` checks for errors
 3. **Diff** (if snapshots exist) - `diff.diff_schemas()` compares current schema against stored snapshot
 4. **Generate C** - `zephyr.generate()` outputs .h and .c files
-5. **Generate Docs** (optional) - `docs.generate()` outputs .html files with change highlighting
+5. **Generate Docs** (optional) - `docs.generate()` outputs `.md` (default) or `.html` files with change highlighting
 6. **Release** (on `gattc release`) - `snapshot.save_snapshot()` stores current state, `changelog.write_entry()` writes a per-revision markdown file (YAML frontmatter + author message, collected from `$EDITOR` or `-m`)
 
 ## Components
@@ -33,7 +33,7 @@ Click-based command-line interface:
 - `gattc init` - Initialize project with gattc.yaml and example schema
 - `gattc compile [schema]` - Generate C code from schema (with automatic change detection)
 - `gattc check [schema]` - Validate schema without generating
-- `gattc docs [schema]` - Generate HTML documentation
+- `gattc docs [schema]` - Generate Markdown or HTML documentation
 - `gattc release [schema]` - Record schema changes, update snapshots, regenerate docs
 - `gattc changelog` - List and edit recorded release entries
 
@@ -130,7 +130,7 @@ Tracks schema changes over time:
 - Stores each revision as its own markdown file (`gattc/changelog/<service>/NNN.md`) with YAML frontmatter (revision, timestamp, detected changes) and a body containing the author's release message
 - Used by `gattc release` to record changes
 - Used by `gattc changelog` to list, locate, and edit entries
-- Used by `gattc docs` to show changelog in generated HTML
+- Used by `gattc docs` to show changelog in generated documentation
 
 ### Generators (`generators/`)
 
@@ -153,17 +153,17 @@ Generates C code for Zephyr RTOS:
 - Characteristic definitions
 - CCC descriptors for notify/indicate characteristics
 
-#### HTML Documentation Generator (`generators/docs.py`)
+#### Documentation Generator (`generators/docs.py`)
 
-Generates HTML documentation for GATT services:
+Generates documentation for GATT services in Markdown (default) or HTML, sharing a single context-building pass and separate Jinja templates per format (`service.md.j2`, `service.html.j2`):
 
 - Service overview with UUID
 - Characteristic tables with properties/permissions
 - Payload field definitions with types, offsets, units
-- Bitfield and value definitions
+- Bitfield and value definitions (inline in HTML; numbered appendix tables in Markdown)
 - Change highlighting (when diff data available)
 - Changelog history
-- Responsive navigation sidebar
+- HTML-only: responsive navigation sidebar, dark mode, client-side search
 
 ## File Structure
 
@@ -181,15 +181,15 @@ gattc/
 │   ├── generators/
 │   │   ├── __init__.py
 │   │   ├── zephyr.py       # Zephyr C generator
-│   │   └── docs.py         # HTML documentation generator
+│   │   └── docs.py         # Markdown/HTML documentation generator
 │   └── templates/
 │       ├── zephyr/         # Jinja2 templates for C code
-│       └── docs/           # Jinja2 templates for HTML
+│       └── docs/           # Jinja2 templates (service.md.j2, service.html.j2)
 ├── tests/
 │   ├── test_schema.py      # Schema parsing and validation
 │   ├── test_generator.py   # Zephyr code generation
 │   ├── test_config.py      # Configuration loading
-│   ├── test_docs.py        # HTML documentation generation
+│   ├── test_docs.py        # Markdown/HTML documentation generation
 │   ├── test_diff.py        # Change detection
 │   ├── test_snapshot.py    # Snapshot storage
 │   ├── test_release.py     # Release/revert flow

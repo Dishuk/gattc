@@ -259,7 +259,7 @@ class TestChangelogFiles:
             assert "New feature" in entries[1]["message"]
 
     def test_initial_release_with_docs_output_regenerates(self, tmp_path):
-        """Initial entry (no 'characteristics' key) must not crash HTML docs template."""
+        """Initial entry (no 'characteristics' key) must not crash the docs template."""
         schema_dir = tmp_path / "gattc"
         schema_dir.mkdir()
         (schema_dir / "test_svc.yaml").write_text(MINIMAL_SCHEMA)

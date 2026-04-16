@@ -1,15 +1,18 @@
 # Documentation Generation
 
-Generate HTML documentation from GATT schemas for sharing with mobile teams, creating ICDs, or internal reference.
+Generate documentation from GATT schemas for sharing with mobile teams, creating ICDs, or internal reference. **Markdown is the default output**; HTML is available as an opt-in.
 
 ## Quick Start
 
 ```bash
-# Single schema
+# Single schema, Markdown (default)
 gattc docs services/sensor_service.yaml -o docs/
 
 # All schemas in project
 gattc docs -o docs/ble/
+
+# HTML output instead
+gattc docs -o docs/ble/ -f html
 ```
 
 ## CLI Reference
@@ -22,9 +25,21 @@ Arguments:
 
 Options:
   -o, --output PATH    Output directory or file path
-  --combined           Merge all services into single HTML file
-  --per-service        Generate separate HTML file per service (default)
+  -f, --format FMT     Output format: md (default) or html
+  --combined           Merge all services into a single file
+  --per-service        Generate a separate file per service (default)
 ```
+
+### Format resolution
+
+The format is chosen from the first rule that matches:
+
+1. Explicit `-f / --format` flag
+2. Suffix of `-o` (if it ends in `.md` or `.html`)
+3. `output.docs.format` in `gattc.yaml`
+4. Fallback: `md`
+
+If `-f` and the `-o` suffix disagree (e.g. `-f md -o out.html`), the command exits with an error.
 
 ## Configuration
 
@@ -34,44 +49,62 @@ In `gattc.yaml`:
 output:
   docs:
     path: "docs/ble/"           # Output directory
-    per_service: true           # true = one .html per service (default)
-                                # false = all services in gatt_services.html
+    per_service: true           # true = one file per service (default)
+                                # false = all services in gatt_services.<ext>
+    format: md                  # "md" (default) or "html"
 ```
 
 ## Output Modes
 
 ### Per-Service (default)
 
-Each schema produces its own HTML file:
+Each schema produces its own file:
 
 ```
 docs/ble/
-├── sensor_service.html
-├── device_info.html
-└── echo_service.html
+├── sensor_service.md
+├── device_info.md
+└── echo_service.md
 ```
+
+Switch the whole project to HTML via `format: html` in `gattc.yaml`, or per-command via `-f html`.
 
 ### Combined
 
-All services merged into one HTML file:
+All services merged into one file:
 
 ```bash
 gattc docs --combined -o docs/ble/
 ```
 
-Produces: `docs/ble/gatt_services.html`
+Produces: `docs/ble/gatt_services.md` (or `gatt_services.html` with `-f html`).
+
+## Markdown vs HTML
+
+| Aspect | Markdown (default) | HTML |
+|--------|--------------------|------|
+| Renders on GitHub / GitLab / Bitbucket | ✅ natively | ❌ raw source shown |
+| Embeds into Confluence / Notion / wikis | ✅ paste-friendly | needs conversion |
+| Git-diffable reviews | ✅ clean diffs | noisy due to styling |
+| Standalone styling & theming | — | ✅ self-contained, dark mode, search |
+| Nested tables | simulated via numbered appendix tables | native nested tables |
+
+Markdown is a better default for contract-first sharing; HTML is preferable when you want a polished, self-contained artifact to open in a browser.
 
 ## Generated Content
 
-The HTML documentation includes:
+Both formats include the same information:
 
 | Section | Contents |
 |---------|----------|
-| Service Info | Name, UUID, description |
+| Service Info | Name, UUID, description, schema version/revision |
 | Characteristics | Name, UUID, properties, permissions |
-| Payload Tables | Field name, type, offset, size, description |
+| Payload Tables | Field name, type, offset, size, description, unit |
 | Bitfield Details | Bit ranges and flag names |
 | Named Values | Value-to-name mappings |
+| Changelog | Per-revision structural changes and release messages |
+
+In Markdown, complex per-field details (bitfields, named enums, nested structs) are rendered as numbered sub-tables (`see Table N`) to work around Markdown's lack of nested tables. HTML renders them inline.
 
 ## Integration with Compile
 
@@ -88,9 +121,10 @@ output:
     source: "src/generated/"
   docs:
     path: "docs/ble/"
+    format: md              # picks format for `compile --docs` and `release`
 ```
 
-Then `gattc compile` generates both C code and HTML docs.
+Then `gattc compile` generates both C code and the configured documentation format.
 
 ## Schema Features for Documentation
 
@@ -135,15 +169,31 @@ flags:
     2-4: mode
 ```
 
-The HTML shows:
+The Markdown main field row references a numbered sub-table:
 
-| Field | Type | Offset | Size | Description |
-|-------|------|--------|------|-------------|
-| flags | uint8 | 0 | 1 | |
+```markdown
+| Name    | Offset | Length | Type    | Description | Value        | Units |
+|---------|--------|--------|---------|-------------|--------------|-------|
+| `flags` | 0      | 1      | `uint8` | -           | see Table 1  | -     |
 
-With expanded bitfield table:
-| Bits | Name |
-|------|------|
-| [0] | enabled |
-| [1] | error |
-| [2:4] | mode |
+#### Table 1 — `flags` bitfield
+| Range | Name     |
+|-------|----------|
+| `0`   | `enabled`|
+| `1`   | `error`  |
+| `2-4` | `mode`   |
+```
+
+HTML renders the bitfield as an inline nested table under the main row.
+
+## Generating Both Formats
+
+`gattc compile` and `gattc release` only clear files in the *currently configured* format. This means you can keep Markdown and HTML outputs side-by-side in the same directory — useful when you want MD for git reviews and HTML for browser viewing:
+
+```bash
+# Generate both (MD from config, HTML on demand)
+gattc compile --docs                    # writes docs/ble/*.md
+gattc docs -f html -o docs/ble/         # writes docs/ble/*.html, leaves .md untouched
+```
+
+Each invocation only touches files in its own format. No manual cleanup needed when switching defaults.
