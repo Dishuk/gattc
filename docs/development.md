@@ -44,15 +44,15 @@ gattc/
 │   ├── generators/
 │   │   ├── __init__.py
 │   │   ├── zephyr.py       # Zephyr C code generator
-│   │   └── docs.py         # HTML documentation generator
+│   │   └── docs.py         # Markdown/HTML documentation generator
 │   └── templates/
 │       ├── zephyr/         # C code templates (.j2)
-│       └── docs/           # HTML templates (.j2)
+│       └── docs/           # Documentation templates (service.md.j2, service.html.j2)
 ├── tests/
 │   ├── test_schema.py      # Schema parsing tests
 │   ├── test_generator.py   # Code generation tests
 │   ├── test_config.py      # Configuration tests
-│   ├── test_docs.py        # HTML documentation tests
+│   ├── test_docs.py        # Markdown/HTML documentation tests
 │   ├── test_diff.py        # Change detection tests
 │   ├── test_snapshot.py    # Snapshot storage tests
 │   ├── test_release.py     # Release flow tests

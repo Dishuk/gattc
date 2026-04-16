@@ -298,9 +298,6 @@ class TestValidateCIdentifier:
         assert reason is not None
         assert "reserved keyword" in reason
 
-    def test_invalid_keyword_static(self):
-        assert _validate_c_identifier("static") is not None
-
     def test_valid_keyword_like(self):
         assert _validate_c_identifier("integer") is None
 

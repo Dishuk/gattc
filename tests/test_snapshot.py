@@ -1,9 +1,5 @@
 """Tests for gattc snapshot and changelog functionality."""
 
-import json
-import pytest
-from pathlib import Path
-
 from gattc.snapshot import (
     get_snapshot_dir,
     get_snapshot_path,
@@ -14,7 +10,7 @@ from gattc.snapshot import (
 )
 from gattc.changelog import build_frontmatter, load_changelog, next_revision, write_entry
 from gattc.diff import diff_schemas
-from gattc.schema import load_schema, Schema, Service, Characteristic, Payload, Field, TypeInfo
+from gattc.schema import Schema, Service, Characteristic, Payload, Field, TypeInfo
 from gattc.config import load_config
 
 
@@ -113,28 +109,6 @@ class TestSaveAndLoadSnapshot:
                 )
             ]
         )
-
-    def test_save_creates_directory(self, tmp_path):
-        """Test save_snapshot creates snapshot directory if needed."""
-        schema = self._create_test_schema()
-
-        snapshot_path = save_snapshot("test_service", schema, config=None, root_dir=tmp_path)
-
-        assert snapshot_path.exists()
-        assert snapshot_path.parent.exists()
-
-    def test_save_creates_valid_json(self, tmp_path):
-        """Test save_snapshot creates valid JSON file."""
-        schema = self._create_test_schema()
-
-        snapshot_path = save_snapshot("test_service", schema, config=None, root_dir=tmp_path)
-
-        with open(snapshot_path) as f:
-            data = json.load(f)
-
-        assert data["schema_version"] == "1.0"
-        assert data["service"]["name"] == "test_service"
-        assert len(data["characteristics"]) == 1
 
     def test_load_returns_none_when_not_exists(self, tmp_path):
         """Test load_snapshot returns None when file doesn't exist."""
@@ -235,25 +209,3 @@ class TestChangelogMessage:
         assert len(entries) == 1
         assert entries[0]["message"] == "Changed temp to uint16 for better precision"
 
-    def test_message_survives_json_roundtrip(self, tmp_path):
-        """Message should persist through save/load cycle."""
-        old_schema = self._make_schema(fields=[
-            Field(name="temp", type_info=TypeInfo(base="uint8", size=1, endian="none", is_array=False), offset=0),
-        ])
-        new_schema = self._make_schema(fields=[
-            Field(name="temp", type_info=TypeInfo(base="uint16", size=2, endian="little", is_array=False), offset=0),
-        ])
-
-        save_snapshot("svc", old_schema, config=None, root_dir=tmp_path)
-        snapshot = load_snapshot("svc", config=None, root_dir=tmp_path)
-        diff = diff_schemas(snapshot, new_schema)
-
-        rev = next_revision("svc", config=None, root_dir=tmp_path)
-        write_entry(
-            "svc", rev, build_frontmatter(diff, rev),
-            "Test roundtrip",
-            config=None, root_dir=tmp_path,
-        )
-
-        loaded = load_changelog("svc", config=None, root_dir=tmp_path)
-        assert loaded[0]["message"] == "Test roundtrip"

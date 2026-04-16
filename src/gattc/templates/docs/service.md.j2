@@ -1,0 +1,275 @@
+{#- Escape pipes and collapse newlines in table cells -#}
+{%- macro cell(text) -%}
+{{ (text or "-") | string | replace("|", "\\|") | replace("\n", " ") }}
+{%- endmacro -%}
+
+{#- Anchor IDs. Explicit <a id> tags below each heading keep IDs stable regardless
+    of GFM slug rules and [NEW]/[CHANGED] status markers in heading text. -#}
+{%- macro svc_anchor(svc) -%}svc-{{ svc.service.name }}{%- endmacro -%}
+{%- macro char_anchor(svc, char) -%}char-{{ svc.service.name }}-{{ char.name }}{%- endmacro -%}
+{%- macro table_anchor(num) -%}table-{{ num | replace('.', '-') }}{%- endmacro -%}
+
+{#- Short marker for the Value column; complex values link to numbered sub-tables -#}
+{%- macro value_marker(field) -%}
+{%- if field.bits -%}[Table {{ field.bits_table }}](#{{ table_anchor(field.bits_table) }})
+{%- elif field["values"].type == "named" and field["values"]["items"] -%}[Table {{ field.values_table }}](#{{ table_anchor(field.values_table) }})
+{%- elif field["values"].type == "range" -%}{{ field["values"].display }}
+{%- elif field["values"].type == "text" -%}{{ cell(field["values"].display) }}
+{%- elif field.nested_fields -%}[Table {{ field.struct_table }}](#{{ table_anchor(field.struct_table) }})
+{%- else -%}-{%- endif -%}
+{%- endmacro -%}
+
+{#- Change-status suffix/wrapper on a name -#}
+{%- macro name_with_status(name, status) -%}
+{%- if status == 'added' -%}{{ name }} **[NEW]**
+{%- elif status == 'modified' -%}{{ name }} **[CHANGED]**
+{%- elif status == 'removed' -%}~~{{ name }}~~
+{%- else -%}{{ name }}{%- endif -%}
+{%- endmacro -%}
+
+{#- A single field row in a payload table -#}
+{%- macro field_row(field) -%}
+| `{{ name_with_status(field.name, field.change_status) }}` | {{ field.offset }} | {{ field.length }} | `{{ field.type }}` | {{ cell(field.description) }} | {{ value_marker(field) }} | {{ cell(field.unit) }} |
+{% endmacro -%}
+
+{#- Sub-tables for complex field detail (bits / enum / nested struct) -#}
+{%- macro field_detail(field) -%}
+{%- if field.bits %}
+
+<a id="{{ table_anchor(field.bits_table) }}"></a>
+#### Table {{ field.bits_table }} — `{{ field.name }}` bitfield
+| Range | Name |
+|-------|------|
+{% for bit in field.bits -%}
+| `{{ bit.range }}` | `{{ bit.name }}` |
+{% endfor -%}
+{%- elif field["values"].type == "named" and field["values"]["items"] %}
+
+<a id="{{ table_anchor(field.values_table) }}"></a>
+#### Table {{ field.values_table }} — `{{ field.name }}` enum values
+| Value | Name |
+|-------|------|
+{% for item in field["values"]["items"] -%}
+| `{{ item.value }}` | `{{ item.name }}` |
+{% endfor -%}
+{%- endif -%}
+{%- if field.nested_fields %}
+
+<a id="{{ table_anchor(field.struct_table) }}"></a>
+#### Table {{ field.struct_table }} — `{{ field.name }}` struct layout
+| Name | Offset | Length | Type | Description | Value | Units |
+|------|--------|--------|------|-------------|-------|-------|
+{% for nested in field.nested_fields -%}
+{{ field_row(nested) -}}
+{% endfor -%}
+{%- for nested in field.nested_fields -%}
+{{ field_detail(nested) -}}
+{%- endfor -%}
+{%- endif -%}
+{%- endmacro -%}
+
+{#- A complete payload section: main table + detail sub-tables -#}
+{%- macro render_payload(payload, title) -%}
+{%- if payload and payload.fields %}
+
+#### {{ title }}{% if payload.size %} ({{ payload.size }} byte{% if payload.size != 1 %}s{% endif %}){% elif payload.is_variable %} (variable length){% endif %}
+| Name | Offset | Length | Type | Description | Value | Units |
+|------|--------|--------|------|-------------|-------|-------|
+{% for field in payload.fields -%}
+{{ field_row(field) -}}
+{% endfor -%}
+{%- for field in payload.fields -%}
+{{ field_detail(field) -}}
+{%- endfor -%}
+{%- endif -%}
+{%- endmacro -%}
+
+{#- Format a characteristic reference with its index (N.M in combined, N. in single) -#}
+{%- macro char_ref(svc, svc_idx, name) -%}
+{%- set idx = svc.char_index.get(name) -%}
+{%- if idx and is_combined -%}`{{ svc_idx }}.{{ idx }} {{ name }}`
+{%- elif idx -%}`{{ idx }}. {{ name }}`
+{%- else -%}`{{ name }}`{%- endif -%}
+{%- endmacro -%}
+
+{#- Render the Change|Detail table for service-level changes (includes added/removed chars).
+    service_change_row_labels is supplied by docs.py. -#}
+{%- macro render_service_table(svc, svc_idx, service_changes, schema_revision, added, removed) -%}
+| Change | Detail |
+|--------|--------|
+{% for change in service_changes -%}
+| {{ service_change_row_labels[change] }} | — |
+{% endfor -%}
+{% if schema_revision is defined -%}
+| Schema revision | `{{ schema_revision.old|default('none') }}` → `{{ schema_revision.new|default('none') }}` |
+{% endif -%}
+{% for idx, name in added -%}
+| Characteristic added | {{ char_ref(svc, svc_idx, name) }} |
+{% endfor -%}
+{% for name in removed -%}
+| Characteristic removed | `{{ name }}` |
+{% endfor -%}
+{%- endmacro -%}
+
+{#- Render the Change|Detail table for one modified characteristic -#}
+{%- macro render_mods_table(mods) -%}
+| Change | Detail |
+|--------|--------|
+{% if mods.uuid is defined -%}
+| UUID changed | `{{ mods.uuid.old }}` → `{{ mods.uuid.new }}` |
+{% endif -%}
+{% if mods.description_changed -%}
+| Description updated | — |
+{% endif -%}
+{% if mods.payload_config_changed -%}
+| Payload config updated | — |
+{% endif -%}
+{% for prop in mods.properties_added|default([]) -%}
+| Property added | `{{ prop }}` |
+{% endfor -%}
+{% for prop in mods.properties_removed|default([]) -%}
+| Property removed | `{{ prop }}` |
+{% endfor -%}
+{% for perm in mods.permissions_added|default([]) -%}
+| Permission added | `{{ perm }}` |
+{% endfor -%}
+{% for perm in mods.permissions_removed|default([]) -%}
+| Permission removed | `{{ perm }}` |
+{% endfor -%}
+{% for fld in mods.fields_added|default([]) -%}
+| Field added | `{{ fld.name }}`{% if fld.type %} (`{{ fld.type }}`){% endif %} |
+{% endfor -%}
+{% for fld in mods.fields_removed|default([]) -%}
+| Field removed | `{{ fld }}` |
+{% endfor -%}
+{% for fld in mods.fields_modified|default([]) -%}
+| Field changed | `{{ fld.name }}`{% if fld.detail %} ({{ fld.detail|replace("->", "→") }}){% endif %} |
+{% endfor -%}
+{% if mods.offsets_changed -%}
+| Payload offsets changed | — |
+{% endif -%}
+{%- endmacro -%}
+
+{#- One revision entry: heading, message, grouped change sections -#}
+{%- macro render_changelog_entry(entry, svc, svc_idx) -%}
+### Revision {{ entry.revision }} — {{ entry.timestamp[:10] }}
+{% if entry.message %}
+{{ entry.message }}
+{% endif -%}
+{%- if entry.changes is defined -%}
+{%- if entry.changes %}
+**Changes:**
+{% for change in entry.changes -%}
+- {{ change }}
+{% endfor -%}
+{%- endif -%}
+{%- else -%}
+{%- set svc_changes = entry.service_changes|default([]) -%}
+{%- set chars = entry.characteristics|default({}) -%}
+{%- set added_pairs = [] -%}
+{%- for name in chars.added|default([]) -%}
+{%- set _ = added_pairs.append((svc.char_index.get(name, 99999), name)) -%}
+{%- endfor -%}
+{%- set added = added_pairs|sort -%}
+{%- set removed = (chars.removed|default([]))|sort -%}
+{%- set modified_pairs = [] -%}
+{%- for name, mods in (chars.modified|default({})).items() -%}
+{%- set _ = modified_pairs.append((svc.char_index.get(name, 99999), name, mods)) -%}
+{%- endfor -%}
+{%- set modified = modified_pairs|sort -%}
+{%- set has_service_section = svc_changes or (entry.schema_revision is defined) or added or removed -%}
+{%- if has_service_section %}
+#### Modified service
+{{ render_service_table(svc, svc_idx, svc_changes, entry.schema_revision, added, removed) }}
+{%- endif -%}
+{%- for idx, name, mods in modified %}
+#### Modified {{ char_ref(svc, svc_idx, name) }}
+{{ render_mods_table(mods) }}
+{%- endfor -%}
+{%- endif -%}
+{%- endmacro -%}
+
+{#- One service section -#}
+{%- macro render_service(svc, svc_idx) -%}
+<a id="{{ svc_anchor(svc) }}"></a>
+# {% if is_combined %}{{ svc_idx }}. {{ svc.service.name }}{% else %}Service: {{ svc.service.name }}{% endif %}
+
+- **UUID:** `{{ svc.service.uuid }}`
+{%- if svc.service.schema_version or svc.service.schema_revision %}
+- **Version:** {{ svc.service.schema_version or "1.0" }}{% if svc.service.schema_revision %} (Rev {{ svc.service.schema_revision }}){% endif %}
+{%- endif %}
+{%- if svc.service.description %}
+
+{{ svc.service.description }}
+{%- endif %}
+
+{%- if svc.changelog %}
+
+<a id="changelog-{{ svc.service.name }}"></a>
+## Changelog
+{% for entry in svc.changelog %}
+{{ render_changelog_entry(entry, svc, svc_idx) }}
+{%- endfor %}
+{%- endif %}
+
+## Characteristics
+{% for char in svc.characteristics %}
+{% if not loop.first %}---
+
+{% endif -%}
+<a id="{{ char_anchor(svc, char) }}"></a>
+### {% if is_combined %}{{ svc_idx }}.{{ svc.char_index[char.name] }}{% else %}{{ svc.char_index[char.name] }}.{% endif %} {{ name_with_status(char.name, char.change_status) }}
+
+- **UUID:** `{{ char.uuid }}`
+- **Properties:** {% for prop in char.properties %}`{{ prop }}`{% if not loop.last %}, {% endif %}{% endfor %}
+- **Permissions:** {% for perm in char.permissions %}`{{ perm }}`{% if not loop.last %}, {% endif %}{% endfor %}
+{%- if char.description %}
+
+{{ char.description }}
+{%- endif %}
+{{ render_payload(char.payload, "Payload") -}}
+{{ render_payload(char.read_payload, "Read Payload") -}}
+{{ render_payload(char.write_payload, "Write Payload") -}}
+{{ render_payload(char.notify_payload, "Notify Payload") -}}
+{%- if not char.payload and not char.read_payload and not char.write_payload and not char.notify_payload %}
+
+_No payload defined._
+{%- endif %}
+{% endfor -%}
+{%- endmacro -%}
+{%- if unreleased %}
+> **UNRELEASED** — run `gattc release` to update this document.
+
+{% endif -%}
+## Contents
+{% if is_combined -%}
+{% for svc in services -%}
+- [{{ loop.index }}. {{ svc.service.name }}](#{{ svc_anchor(svc) }})
+{% set svc_idx = loop.index -%}
+{% if svc.changelog -%}
+{{ "  " }}- [Changelog](#changelog-{{ svc.service.name }})
+{% endif -%}
+{% for char in svc.characteristics -%}
+{{ "  " }}- [{{ svc_idx }}.{{ loop.index }} {{ char.name }}](#{{ char_anchor(svc, char) }})
+{% endfor -%}
+{% endfor -%}
+{% else -%}
+{% if services[0].changelog -%}
+- [Changelog](#changelog-{{ services[0].service.name }})
+{% endif -%}
+{% for char in services[0].characteristics -%}
+- [{{ loop.index }}. {{ char.name }}](#{{ char_anchor(services[0], char) }})
+{% endfor -%}
+{% endif %}
+{% for svc in services -%}
+{%- if not loop.first %}
+
+---
+
+{% endif -%}
+{{ render_service(svc, loop.index) }}
+{%- endfor %}
+
+---
+
+_Generated by gattc._

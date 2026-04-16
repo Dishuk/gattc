@@ -117,26 +117,30 @@ output:
 
 #### output.docs
 
-HTML documentation output.
+Documentation output. Generates Markdown by default; HTML is available via `format: html`.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `path` | string | - | Documentation output directory |
 | `per_service` | bool | `true` | `true` = separate file per service, `false` = single combined file |
+| `format` | string | `md` | Output format: `md` (Markdown) or `html` |
 
 ```yaml
 output:
   docs:
     path: docs/ble/
-    per_service: false   # All services in one HTML file
+    per_service: false   # All services in one file
+    format: md           # or "html"
 ```
 
-Short syntax (path only, defaults to per_service: true):
+Short syntax (path only, defaults to `per_service: true`, `format: md`):
 
 ```yaml
 output:
   docs: docs/ble/
 ```
+
+The `format` set here is used by `gattc compile --docs`, `gattc release`, and — unless overridden — by `gattc docs`. The CLI's `-f/--format` flag (and inference from `-o` suffix) overrides this on a per-invocation basis.
 
 ### services
 
@@ -212,8 +216,8 @@ project/
 │           └── config_service.c
 └── docs/
     └── ble/
-        ├── sensor_service.html
-        └── config_service.html
+        ├── sensor_service.md
+        └── config_service.md
 ```
 
 Corresponding `gattc.yaml`:

@@ -1,5 +1,6 @@
-"""Tests for HTML documentation generator."""
+"""Tests for the Markdown/HTML documentation generator."""
 
+import re
 import pytest
 from pathlib import Path
 
@@ -48,14 +49,16 @@ def _make_schema(name="test_service", uuid="12345678-1234-1234-1234-123456789abc
 
 
 def _simple_schema_yaml(service_name="test_service",
-                        service_uuid="12345678-1234-1234-1234-123456789abc"):
+                        service_uuid="12345678-1234-1234-1234-123456789abc",
+                        service_description=None):
     """Return minimal YAML schema string."""
+    desc_line = f'\n  description: "{service_description}"' if service_description else ""
     return f"""
 schema_version: "1.0"
 
 service:
   name: {service_name}
-  uuid: "{service_uuid}"
+  uuid: "{service_uuid}"{desc_line}
 
 characteristics:
   temperature:
@@ -343,7 +346,7 @@ class TestGenerate:
         schema = load_schema(schema_file)
 
         output = tmp_path / "docs" / "test_service"
-        result = docs.generate(schema, output)
+        result = docs.generate(schema, output, fmt="html")
         assert result.suffix == ".html"
         assert result.exists()
 
@@ -528,7 +531,7 @@ class TestGenerateCombined:
     def test_combined_adds_html_extension(self, tmp_path):
         schema = self._load_schema_from_yaml(tmp_path, "svc", _simple_schema_yaml())
         output = tmp_path / "docs" / "combined"
-        result = docs.generate_combined([schema], output)
+        result = docs.generate_combined([schema], output, fmt="html")
         assert result.suffix == ".html"
         assert result.exists()
 
@@ -589,3 +592,340 @@ class TestGenerateCombined:
         result = docs.generate_combined([schema], output, unreleased=True)
         html = result.read_text()
         assert "unreleased" in html.lower()
+
+
+# ---------------------------------------------------------------------------
+# Integration tests: Markdown output
+# ---------------------------------------------------------------------------
+
+_BITFIELD_SCHEMA_YAML = """
+schema_version: "1.0"
+
+service:
+  name: bit_service
+  uuid: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+
+characteristics:
+  status:
+    uuid: "aaaaaaaa-aaaa-aaaa-aaaa-000000000001"
+    properties: [read]
+    permissions: [read]
+    payload:
+      flags:
+        type: uint8
+        bits:
+          0: ready
+          1: error
+"""
+
+
+# Rich schema: exercises all three sub-table kinds (bits / named values /
+# nested struct) and more than one sub-table on a single characteristic,
+# so anchor/reference consistency tests hit every branch of the walk.
+_RICH_SCHEMA_YAML = """
+schema_version: "1.0"
+
+service:
+  name: rich_service
+  uuid: "cccccccc-cccc-cccc-cccc-cccccccccccc"
+
+characteristics:
+  combo:
+    uuid: "cccccccc-cccc-cccc-cccc-000000000001"
+    properties: [read]
+    permissions: [read]
+    payload:
+      flags:
+        type: uint8
+        bits:
+          0: ready
+          1-3: mode
+      opcode:
+        type: uint8
+        values:
+          0: "reset"
+          1: "start"
+          2: "stop"
+
+  samples_char:
+    uuid: "cccccccc-cccc-cccc-cccc-000000000002"
+    properties: [notify]
+    permissions: [read]
+    payload:
+      count: uint8
+      samples[]:
+        x: uint16
+        y: uint16
+"""
+
+
+class TestGenerateMarkdown:
+    def _load(self, tmp_path, name, yaml_content):
+        path = tmp_path / f"{name}.yaml"
+        path.write_text(yaml_content)
+        return load_schema(path)
+
+    def test_basic_markdown(self, tmp_path):
+        schema = self._load(tmp_path, "test", _simple_schema_yaml())
+        output = tmp_path / "docs" / "test.md"
+        result = docs.generate(schema, output, fmt="md")
+
+        assert result.suffix == ".md"
+        assert result.exists()
+        md = result.read_text()
+        assert "# Service:" in md
+        assert "## Characteristics" in md
+        assert "|---" in md  # GFM table separator
+
+    def test_numbered_subtable(self, tmp_path):
+        schema = self._load(tmp_path, "bits", _BITFIELD_SCHEMA_YAML)
+        output = tmp_path / "docs" / "bits.md"
+        result = docs.generate(schema, output, fmt="md")
+
+        md = result.read_text()
+        # Single-service mode: Y.Z numbering (char 1, sub-table 1).
+        assert "[Table 1.1](#table-1-1)" in md
+        assert "#### Table 1.1 —" in md
+        assert "`flags` bitfield" in md
+
+    def test_combined_table_numbering_is_hierarchical(self, tmp_path):
+        """Combined mode uses X.Y.Z: service index, char index, sub-table counter."""
+        schema1 = self._load(tmp_path, "svc1", _BITFIELD_SCHEMA_YAML)
+        # Second service with a bitfield of its own — must start at 2.1.N, not 1.1.N.
+        _OTHER = _BITFIELD_SCHEMA_YAML.replace("bit_service", "other_service") \
+            .replace("aaaaaaaa", "bbbbbbbb")
+        schema2 = self._load(tmp_path, "svc2", _OTHER)
+
+        output = tmp_path / "docs" / "combined.md"
+        result = docs.generate_combined([schema1, schema2], output, fmt="md")
+        md = result.read_text()
+
+        # Each service's first characteristic's first sub-table.
+        assert "[Table 1.1.1](#table-1-1-1)" in md
+        assert "#### Table 1.1.1 —" in md
+        assert "[Table 2.1.1](#table-2-1-1)" in md
+        assert "#### Table 2.1.1 —" in md
+
+    def test_table_references_resolve_to_anchors(self, tmp_path):
+        """Every `#table-X...` link must have a matching `<a id="table-X...">`.
+
+        Guards against the walk-order coupling between docs.py's
+        `_assign_table_numbers` and service.md.j2: if either reorders
+        its traversal, sub-table references silently point to the wrong
+        (or nonexistent) anchor. Runs in both single and combined mode
+        to cover Y.Z and X.Y.Z numbering.
+        """
+        link_re = re.compile(r"\(#(table-[\w-]+)\)")
+        anchor_re = re.compile(r'<a id="(table-[\w-]+)"></a>')
+
+        def check(md: str, min_tables: int) -> None:
+            links = set(link_re.findall(md))
+            anchors = set(anchor_re.findall(md))
+            # Sanity: the fixture must actually produce sub-tables, else the
+            # test would pass vacuously on any future template that stops
+            # emitting them.
+            assert len(anchors) >= min_tables, (
+                f"expected at least {min_tables} anchors, got {len(anchors)}"
+            )
+            assert links == anchors, (
+                f"link/anchor mismatch:\n"
+                f"  links without anchors: {links - anchors}\n"
+                f"  anchors without links: {anchors - links}"
+            )
+
+        # Single-service: combo char has bits + named values (2 sub-tables),
+        # samples_char has nested struct (1 sub-table) → 3 total.
+        schema = self._load(tmp_path, "rich", _RICH_SCHEMA_YAML)
+        single_md = docs.generate(
+            schema, tmp_path / "rich.md", fmt="md"
+        ).read_text()
+        check(single_md, min_tables=3)
+
+        # Combined mode doubles it and switches numbering to X.Y.Z.
+        schema2 = self._load(
+            tmp_path, "rich2",
+            _RICH_SCHEMA_YAML
+                .replace("rich_service", "rich_service_2")
+                .replace("cccccccc", "dddddddd"),
+        )
+        combined_md = docs.generate_combined(
+            [schema, schema2], tmp_path / "combined.md", fmt="md"
+        ).read_text()
+        check(combined_md, min_tables=6)
+
+    def test_toc_and_anchors_single_mode(self, tmp_path):
+        """Single-service docs emit a flat char-only TOC plus anchors on each H3."""
+        yaml = _simple_schema_yaml() + """
+  pressure:
+    uuid: "12345678-1234-1234-1234-123456789002"
+    properties: [read]
+    permissions: [read]
+    payload:
+      value:
+        type: uint16
+"""
+        schema = self._load(tmp_path, "toc", yaml)
+        output = tmp_path / "docs" / "toc.md"
+        md = docs.generate(schema, output, fmt="md").read_text()
+
+        assert "## Contents" in md
+        assert "- [1. temperature](#char-test_service-temperature)" in md
+        assert "- [2. pressure](#char-test_service-pressure)" in md
+        # Anchor emitted immediately before the char H3.
+        assert '<a id="char-test_service-temperature"></a>\n### 1.' in md
+
+    def test_toc_includes_changelog_when_present(self, tmp_path):
+        """TOC lists a Changelog entry only for services that have changelog data."""
+        s1 = self._load(tmp_path, "s1", _simple_schema_yaml(
+            service_name="svc_a",
+            service_uuid="11111111-1111-1111-1111-111111111111",
+        ))
+        s2 = self._load(tmp_path, "s2", _simple_schema_yaml(
+            service_name="svc_b",
+            service_uuid="22222222-2222-2222-2222-222222222222",
+        ))
+        changelogs = {"svc_a": [{"revision": 1, "timestamp": "2026-04-15 10:00",
+                                 "message": "Init"}]}
+        output = tmp_path / "docs" / "combined.md"
+        md = docs.generate_combined([s1, s2], output, fmt="md",
+                                    changelogs=changelogs).read_text()
+
+        assert "  - [Changelog](#changelog-svc_a)" in md
+        assert "changelog-svc_b" not in md  # no changelog → no TOC entry, no anchor
+        assert '<a id="changelog-svc_a"></a>' in md
+
+    def test_toc_and_anchors_combined_mode(self, tmp_path):
+        """Combined docs emit a two-level TOC plus svc + char anchors."""
+        s1 = self._load(tmp_path, "s1", _simple_schema_yaml(
+            service_name="svc_a",
+            service_uuid="11111111-1111-1111-1111-111111111111",
+        ))
+        s2 = self._load(tmp_path, "s2", _simple_schema_yaml(
+            service_name="svc_b",
+            service_uuid="22222222-2222-2222-2222-222222222222",
+        ))
+        output = tmp_path / "docs" / "combined.md"
+        md = docs.generate_combined([s1, s2], output, fmt="md").read_text()
+
+        assert "## Contents" in md
+        assert "- [1. svc_a](#svc-svc_a)" in md
+        assert "  - [1.1 temperature](#char-svc_a-temperature)" in md
+        assert "- [2. svc_b](#svc-svc_b)" in md
+        assert "  - [2.1 temperature](#char-svc_b-temperature)" in md
+        assert '<a id="svc-svc_a"></a>\n# 1. svc_a' in md
+        assert '<a id="char-svc_b-temperature"></a>\n### 2.1' in md
+
+    def test_structured_changelog_entry(self, tmp_path):
+        schema = self._load(tmp_path, "test", _simple_schema_yaml())
+        changelog = [{
+            "revision": 2,
+            "timestamp": "2026-04-15 10:00",
+            "message": "Overhaul",
+            "characteristics": {
+                "added": ["device_info"],
+                "removed": ["legacy_cmd"],
+                "modified": {
+                    "temperature": {
+                        "uuid": {"old": "aaa", "new": "bbb"},
+                        "fields_removed": ["stale_field"],
+                        "fields_modified": [{"name": "value", "detail": "type uint16 -> int16"}],
+                        "offsets_changed": True,
+                    },
+                },
+            },
+        }]
+
+        output = tmp_path / "docs" / "test.md"
+        result = docs.generate(schema, output, fmt="md", changelog=changelog)
+        md = result.read_text()
+
+        assert "### Revision 2 — 2026-04-15" in md
+        # Added / removed characteristics appear as rows in the service-level table
+        assert "#### Modified service" in md
+        assert "| Characteristic added | `device_info` |" in md
+        assert "| Characteristic removed | `legacy_cmd` |" in md
+        assert "#### Modified `1. temperature`" in md
+        assert "| Change | Detail |" in md
+        assert "| UUID changed | `aaa` → `bbb` |" in md
+        assert "| Field removed | `stale_field` |" in md
+        assert "| Payload offsets changed | — |" in md
+        # Old diff fence should be gone
+        assert "```diff" not in md
+
+    def test_service_change_tags_render_with_mapped_labels(self, tmp_path):
+        schema = self._load(tmp_path, "test", _simple_schema_yaml())
+        changelog = [{
+            "revision": 2,
+            "timestamp": "2026-04-15 10:00",
+            "message": "Rename",
+            "service_changes": ["uuid", "description"],
+        }]
+
+        output = tmp_path / "docs" / "test.md"
+        result = docs.generate(schema, output, fmt="md", changelog=changelog)
+        md = result.read_text()
+
+        assert "| UUID changed | — |" in md
+        assert "| Description updated | — |" in md
+
+    def test_service_change_unknown_tag_crashes(self, tmp_path):
+        """An unknown tag must surface as an error, not silent passthrough."""
+        schema = self._load(tmp_path, "test", _simple_schema_yaml())
+        changelog = [{
+            "revision": 2,
+            "timestamp": "2026-04-15 10:00",
+            "message": "Rename",
+            "service_changes": ["bogus_tag"],
+        }]
+
+        output = tmp_path / "docs" / "test.md"
+        with pytest.raises(ValueError, match="bogus_tag"):
+            docs.generate(schema, output, fmt="md", changelog=changelog)
+
+    def test_real_diff_produces_known_service_change_tags(self, tmp_path):
+        """Guards against drift: every tag emitted by diff_schemas must have a label
+        in BOTH label maps, and the two maps must share the same keyset."""
+        from gattc.diff import (
+            diff_schemas, SERVICE_CHANGE_LABELS, SERVICE_CHANGE_ROW_LABELS,
+        )
+        from gattc.snapshot import _schema_to_dict
+
+        # Maps must agree — otherwise a new tag added to one but not the other
+        # silently renders empty in a template.
+        assert SERVICE_CHANGE_LABELS.keys() == SERVICE_CHANGE_ROW_LABELS.keys()
+
+        old_schema = self._load(tmp_path, "old", _simple_schema_yaml(
+            service_name="svc_a", service_uuid="11111111-1111-1111-1111-111111111111",
+            service_description="old desc",
+        ))
+        new_schema = self._load(tmp_path, "new", _simple_schema_yaml(
+            service_name="svc_b", service_uuid="22222222-2222-2222-2222-222222222222",
+            service_description="new desc",
+        ))
+        diff = diff_schemas(_schema_to_dict(old_schema), new_schema)
+
+        assert set(diff.service_changes) == {"name", "uuid", "description"}
+        for tag in diff.service_changes:
+            assert tag in SERVICE_CHANGE_LABELS
+            assert tag in SERVICE_CHANGE_ROW_LABELS
+
+    def test_combined_markdown_prefixes_headings(self, tmp_path):
+        schema1 = self._load(tmp_path, "svc1", _simple_schema_yaml(
+            service_name="service_alpha",
+            service_uuid="11111111-1111-1111-1111-111111111111",
+        ))
+        schema2 = self._load(tmp_path, "svc2", _simple_schema_yaml(
+            service_name="service_beta",
+            service_uuid="22222222-2222-2222-2222-222222222222",
+        ))
+
+        output = tmp_path / "docs" / "combined.md"
+        result = docs.generate_combined([schema1, schema2], output, fmt="md")
+
+        md = result.read_text()
+        assert "# 1. service_alpha" in md
+        assert "# 2. service_beta" in md
+        assert "\n---\n" in md  # service separator
+        # Characteristics numbered as <service>.<char> in combined mode
+        assert "### 1.1 temperature" in md
+        assert "### 2.1 temperature" in md

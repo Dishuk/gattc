@@ -71,7 +71,7 @@
 {%- macro render_payload(payload, title) -%}
 {%- if payload and payload.fields %}
                     <div class="payload-section">
-                        <div class="payload-title">{{ title }}{% if payload.size %} ({{ payload.size }} bytes){% elif payload.is_variable %} (variable length){% endif %}</div>
+                        <div class="payload-title">{{ title }}{% if payload.size %} ({{ payload.size }} byte{% if payload.size != 1 %}s{% endif %}){% elif payload.is_variable %} (variable length){% endif %}</div>
                         <table>
 {{ render_field_headers() }}
 {%- for field in payload.fields %}
@@ -233,7 +233,6 @@
         [data-theme="dark"] .changelog-changes .added { color: #4ade80; }
         [data-theme="dark"] .changelog-changes .removed { color: #f87171; }
         [data-theme="dark"] .changelog-changes .modified { color: #fbbf24; }
-        .changelog-empty { color: var(--text-secondary); font-style: italic; text-align: center; padding: 1rem; }
 
         table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.9em; table-layout: fixed; }
         th, td { padding: 0.4rem 0.5rem; text-align: left; vertical-align: top; border-bottom: 1px solid var(--border-color); word-wrap: break-word; }
@@ -415,7 +414,6 @@
 {%- if svc.changelog %}
             <h2 id="{% if is_combined %}{{ svc.service.name }}-{% endif %}changelog">Changelog</h2>
             <div class="changelog">
-{%- if svc.changelog|length > 0 %}
                 <table class="changelog-table">
                     <thead>
                         <tr>
@@ -442,9 +440,9 @@
 {% endif %}
 {%- endfor %}
 {%- else %}
-{#- New format: structured data -#}
+{#- New format: structured data. service_change_labels is supplied by docs.py -#}
 {%- for change in entry.service_changes|default([]) %}
-{{ change }}
+{{ service_change_labels[change] }}
 {% endfor %}
 {%- if entry.schema_revision is defined %}
 Schema revision: {{ entry.schema_revision.old|default('none') }} -> {{ entry.schema_revision.new|default('none') }}
@@ -482,9 +480,6 @@ Schema revision: {{ entry.schema_revision.old|default('none') }} -> {{ entry.sch
 {%- endfor %}
                     </tbody>
                 </table>
-{%- else %}
-                <p class="changelog-empty">No changes recorded yet.</p>
-{%- endif %}
             </div>
 {%- endif %}
 

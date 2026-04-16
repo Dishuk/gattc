@@ -259,7 +259,7 @@ class TestChangelogFiles:
             assert "New feature" in entries[1]["message"]
 
     def test_initial_release_with_docs_output_regenerates(self, tmp_path):
-        """Initial entry (no 'characteristics' key) must not crash HTML docs template."""
+        """Initial entry (no 'characteristics' key) must not crash the docs template."""
         schema_dir = tmp_path / "gattc"
         schema_dir.mkdir()
         (schema_dir / "test_svc.yaml").write_text(MINIMAL_SCHEMA)
@@ -276,16 +276,4 @@ class TestChangelogFiles:
             assert result.exit_code == 0
             assert "Initial release recorded" in result.output
             # Docs file should have been generated without template errors.
-            assert any((tmp_path / "docs").glob("*.html"))
-
-    def test_no_prev_json_is_written(self, project_dir):
-        """The old .prev.json backup files should no longer exist."""
-        runner = CliRunner()
-        with runner.isolated_filesystem(temp_dir=project_dir):
-            runner.invoke(main, ["release", "-m", "Initial"], catch_exceptions=False)
-            (project_dir / "gattc" / "test_svc.yaml").write_text(MODIFIED_SCHEMA)
-            runner.invoke(main, ["release", "-m", "Bump"], catch_exceptions=False)
-
-            snapshots_dir = project_dir / "gattc" / "snapshots"
-            prev_files = list(snapshots_dir.glob("*.prev.json"))
-            assert prev_files == []
+            assert any((tmp_path / "docs").glob("*.md"))

@@ -36,6 +36,7 @@ def _collect_output_files(
     source_dir: Optional[Path],
     docs_dir: Optional[Path],
     generate_docs: bool,
+    docs_fmt: str = "md",
 ) -> List[Path]:
     """Build the list of files that will be generated, so only those get cleared."""
     files: List[Path] = []
@@ -47,7 +48,7 @@ def _collect_output_files(
             if header_dir is None:
                 files.append(source_dir / f"{name}.h")
         if generate_docs and docs_dir:
-            files.append(docs_dir / f"{name}.html")
+            files.append(docs_dir / f"{name}.{docs_fmt}")
     return files
 
 
@@ -57,9 +58,10 @@ def _clear_output_files(
     source_dir: Optional[Path],
     docs_dir: Optional[Path],
     generate_docs: bool,
+    docs_fmt: str = "md",
 ) -> None:
     """Clear only the files that will be regenerated."""
-    files = _collect_output_files(names, header_dir, source_dir, docs_dir, generate_docs)
+    files = _collect_output_files(names, header_dir, source_dir, docs_dir, generate_docs, docs_fmt)
     cleared = _clear_files(files)
     if cleared:
         click.echo(f"Cleared {cleared} previously generated file(s)")
@@ -162,15 +164,17 @@ def _generate_combined_docs(
     diffs: Optional[Dict[str, SchemaDiff]],
     changelogs: Optional[Dict[str, List[Dict[str, Any]]]],
     unreleased: bool,
+    fmt: str = "md",
 ) -> Path:
-    """Generate combined HTML docs for all schemas."""
+    """Generate combined docs for all schemas."""
     from ..generators import docs as docs_gen
     return docs_gen.generate_combined(
         loaded_schemas,
-        docs_dir / "gatt_services.html",
+        docs_dir / f"gatt_services.{fmt}",
         diffs=diffs,
         changelogs=changelogs,
         unreleased=unreleased,
+        fmt=fmt,
     )
 
 
@@ -249,10 +253,11 @@ def _compile_schema(
 
     if generate_docs and effective_docs_dir:
         from ..generators import docs as docs_gen
-        docs_output = effective_docs_dir / f"{schema_path.stem}.html"
+        fmt = effective_output.docs.format
+        docs_output = effective_docs_dir / f"{schema_path.stem}.{fmt}"
         unreleased = enable_diff and (not has_snapshot or (diff is not None and diff.has_changes))
-        html_path = docs_gen.generate(s, docs_output, diff=diff, changelog=changelog_history, unreleased=unreleased)
-        generated.append(html_path)
+        doc_path = docs_gen.generate(s, docs_output, diff=diff, changelog=changelog_history, unreleased=unreleased, fmt=fmt)
+        generated.append(doc_path)
 
     return generated, diff, s
 
@@ -274,6 +279,7 @@ def _compile_single_schema_mode(
 
     generate_docs = docs if docs is not None else False
     docs_dir = config.output.docs.path if config else None
+    docs_fmt = config.output.docs.format if config else "md"
 
     s_preview = load_schema(schema)
     _clear_output_files(
@@ -282,6 +288,7 @@ def _compile_single_schema_mode(
         source or output_dir,
         docs_dir,
         generate_docs,
+        docs_fmt,
     )
 
     generated, diff, s = _compile_schema(
@@ -338,11 +345,13 @@ def _compile_combined_mode(
     click.echo(f"Generated: {source_path}")
 
     if generate_docs and docs_dir:
+        fmt = config.output.docs.format if config else "md"
         docs_path = _generate_combined_docs(
             loaded_schemas, docs_dir,
             diffs if enable_diff else None,
             changelogs if enable_diff else None,
             changes_detected,
+            fmt=fmt,
         )
         click.echo(f"Generated: {docs_path}")
 
@@ -414,11 +423,13 @@ def _compile_per_service_mode(
         raise click.ClickException("No schemas compiled successfully")
 
     if docs_combined and generate_docs and docs_dir and loaded_schemas:
+        fmt = config.output.docs.format if config else "md"
         docs_path = _generate_combined_docs(
             loaded_schemas, docs_dir,
             diffs if enable_diff else None,
             changelogs if enable_diff else None,
             changes_detected,
+            fmt=fmt,
         )
         click.echo(f"Generated: {docs_path}")
 
@@ -436,7 +447,7 @@ def _compile_per_service_mode(
 @click.option("--source", type=click.Path(path_type=Path), help="Output directory for source files")
 @click.option("--combined", is_flag=True, default=None, help="Generate all services in a single .h/.c file pair")
 @click.option("--per-service", "per_service", is_flag=True, default=None, help="Generate separate .h/.c files per service")
-@click.option("--docs/--no-docs", default=None, help="Generate HTML documentation")
+@click.option("--docs/--no-docs", default=None, help="Generate documentation (Markdown or HTML)")
 @click.option("--no-diff", is_flag=True, default=False, help="Skip change detection against snapshots")
 def compile(
     schema: Optional[Path],
@@ -534,6 +545,7 @@ def compile(
         source_dir or output_dir,
         docs_dir,
         generate_docs,
+        config.output.docs.format,
     )
 
     try:

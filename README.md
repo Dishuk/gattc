@@ -1,6 +1,6 @@
 # gattc - GATT Compiler
 
-A contract-first tool for BLE development. Define GATT services once in YAML, generate type-safe code for firmware.
+A schema compiler for BLE GATT services. Generates firmware C code and documentation (Markdown or HTML) from YAML definitions.
 
 ## Prerequisites
 
@@ -68,7 +68,7 @@ gattc/
 │   ├── config.py           # Project configuration
 │   └── generators/
 │       ├── zephyr.py       # C code generator
-│       └── docs.py         # HTML documentation generator
+│       └── docs.py         # Markdown/HTML documentation generator
 ├── tests/
 └── docs/
 ```
@@ -82,7 +82,7 @@ gattc/
 | [Schema Specification](docs/schema.md) | YAML schema format, data types, field syntax |
 | [CLI Reference](docs/cli.md) | Command-line usage and options |
 | [Code Generation](docs/codegen.md) | What gets generated, philosophy, resource considerations |
-| [Documentation Generation](docs/docgen.md) | HTML documentation output |
+| [Documentation Generation](docs/docgen.md) | Markdown (default) or HTML documentation output |
 | [Architecture](docs/architecture.md) | System design, components, data flow |
 | [Development](docs/development.md) | Build commands, testing, contributing |
 

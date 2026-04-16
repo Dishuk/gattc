@@ -87,14 +87,17 @@ Generates `temperature_service.h` and `temperature_service.c`.
 ### 5. Generate Documentation
 
 ```bash
-# Standalone HTML docs
+# Standalone Markdown docs (default)
 gattc docs -o docs/ble/
+
+# HTML instead
+gattc docs -o docs/ble/ -f html
 
 # Or generate docs alongside C code
 gattc compile --docs
 ```
 
-Generates an HTML page per service with characteristic tables, payload layouts, bitfield definitions, and value descriptions.
+Generates one file per service with characteristic tables, payload layouts, bitfield definitions, and value descriptions. Markdown is the default (git-friendly, renders on GitHub); set `output.docs.format: html` in `gattc.yaml` for a styled standalone HTML page.
 
 ## Using Generated Code
 
@@ -238,7 +241,7 @@ Pack/unpack functions handle byte-swapping automatically.
 
 ### Field Metadata
 
-Fields support documentation hints that appear in generated HTML docs:
+Fields support documentation hints that appear in generated docs:
 
 ```yaml
 temperature:
@@ -278,7 +281,7 @@ This:
 2. Detects structural changes (added/removed/modified characteristics, fields, properties)
 3. Records a changelog entry with the provided message and the detected changes
 4. Updates the snapshot to the current state
-5. Regenerates HTML documentation
+5. Regenerates documentation in the configured format
 
 ### Change Detection During Compile
 
@@ -288,7 +291,7 @@ Use `--no-diff` to skip change detection.
 
 ### Unreleased Changes in Documentation
 
-Running `gattc compile --docs` or `gattc docs` after modifying a schema but before running `gattc release` causes the generated HTML to show an **"UNRELEASED"** banner at the top, warning that the documentation reflects changes not yet recorded.
+Running `gattc compile --docs` or `gattc docs` after modifying a schema but before running `gattc release` causes the generated document to show an **"UNRELEASED"** banner at the top, warning that the documentation reflects changes not yet recorded.
 
 Running `gattc release` clears the banner and adds change highlighting (green for added, red for removed) to the documentation.
 
@@ -329,7 +332,7 @@ gattc changelog edit 2
 The same default applies to `gattc changelog path` — omit the revision to get
 the path to the latest entry.
 
-You can also edit the `.md` files directly. Changes are picked up by `gattc docs` and appear in the generated HTML.
+You can also edit the `.md` changelog files directly. Changes are picked up by `gattc docs` and appear in the generated documentation.
 
 Use `gattc changelog` (or `gattc changelog list`) to see all revisions.
 
@@ -393,6 +396,6 @@ git diff --exit-code src/generated/ || \
 | [Configuration](config.md) | `gattc.yaml` reference |
 | [CLI Reference](cli.md) | All commands, options, and exit codes |
 | [Code Generation](codegen.md) | Generated code details, resource costs, endianness handling |
-| [Documentation Generation](docgen.md) | HTML output modes and customization |
+| [Documentation Generation](docgen.md) | Markdown/HTML output modes and customization |
 | [Architecture](architecture.md) | System design and data flow |
 | [Development](development.md) | Build, test, contribute |

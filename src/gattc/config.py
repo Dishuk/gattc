@@ -39,6 +39,7 @@ class DocsOutputConfig:
     """Documentation output configuration."""
     path: Optional[Path] = None
     per_service: bool = True  # True = one file per service, False = all combined
+    format: str = "md"  # "md" (default) or "html"
 
     def is_combined(self) -> bool:
         """Check if all services should be combined into single file."""
@@ -137,19 +138,24 @@ def _parse_docs_output(docs_raw: Union[str, dict], root_dir: Path) -> DocsOutput
     """Parse docs output configuration.
 
     Supports:
-        - String: "path/" -> docs path with default (per_service=True)
-        - Dict with 'path' and/or 'per_service': full configuration
+        - String: "path/" -> docs path with default (per_service=True, format='md')
+        - Dict with 'path', 'per_service', and/or 'format': full configuration
     """
     docs_config = DocsOutputConfig()
 
     if isinstance(docs_raw, str):
         docs_config.path = root_dir / docs_raw
     elif isinstance(docs_raw, dict):
-        _warn_unknown_keys(docs_raw, {"path", "per_service"}, "output.docs")
+        _warn_unknown_keys(docs_raw, {"path", "per_service", "format"}, "output.docs")
         if "path" in docs_raw:
             docs_config.path = root_dir / docs_raw["path"]
         if "per_service" in docs_raw:
             docs_config.per_service = bool(docs_raw["per_service"])
+        if "format" in docs_raw:
+            fmt = str(docs_raw["format"]).lower()
+            if fmt not in ("md", "html"):
+                raise ValueError(f"'output.docs.format' must be 'md' or 'html', got {fmt!r}")
+            docs_config.format = fmt
     else:
         raise ValueError(f"'docs' must be a string or dict, got {type(docs_raw).__name__}")
 
