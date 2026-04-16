@@ -1,7 +1,5 @@
 # Schema Specification
 
-> **Version 0.2** (draft)
-
 ## Top-Level Structure
 
 ```yaml

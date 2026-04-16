@@ -229,6 +229,30 @@ ssize_t shock_thresh_write_cb(struct bt_conn *conn, const struct bt_gatt_attr *a
 }
 ```
 
+## Attribute Table Access
+
+The generated header also exports symbols for reaching into the service's GATT attribute table from other translation units.
+
+### Service extern
+
+For each service, the `.c` defines the service handle and the `.h` declares it `extern`:
+
+```c
+extern const struct bt_gatt_service_static my_service_svc;
+```
+
+This lets application code reference the service (e.g. to pass attribute pointers to Zephyr APIs) without having to include the generated source.
+
+### Value-attribute index macros
+
+For every characteristic, the header defines a macro giving the index of that characteristic's value attribute within `my_service_svc.attrs[]`:
+
+```c
+#define MY_SERVICE_SENSOR_DATA_VAL_ATTR_IDX 2
+```
+
+Use it whenever you need a `struct bt_gatt_attr *` for the characteristic — for example with `bt_gatt_notify()`, `bt_gatt_indicate()`, or attribute lookups — instead of hand-counting or hard-coding an index. Adding or removing characteristics (or their CCCs) updates the macro automatically, so the caller stays in sync with the table layout.
+
 ## Notify/Indicate Support
 
 Characteristics with `notify` or `indicate` properties automatically get a CCC (Client Characteristic Configuration) descriptor generated.
