@@ -104,7 +104,7 @@ Both formats include the same information:
 | Named Values | Value-to-name mappings |
 | Changelog | Per-revision structural changes and release messages |
 
-In Markdown, complex per-field details (bitfields, named enums, nested structs) are rendered as numbered sub-tables (`see Table N`) to work around Markdown's lack of nested tables. HTML renders them inline.
+In Markdown, complex per-field details (bitfields, named enums, nested structs) are rendered as numbered sub-tables linked via inline anchors (e.g. `[Table 1.1](#table-1-1)`) to work around Markdown's lack of nested tables. HTML renders them inline. A `## Contents` table of contents is emitted at the top of every Markdown doc (flat in single-service mode, two-level in combined mode).
 
 ## Integration with Compile
 
@@ -169,14 +169,15 @@ flags:
     2-4: mode
 ```
 
-The Markdown main field row references a numbered sub-table:
+The Markdown main field row links to a numbered sub-table:
 
 ```markdown
-| Name    | Offset | Length | Type    | Description | Value        | Units |
-|---------|--------|--------|---------|-------------|--------------|-------|
-| `flags` | 0      | 1      | `uint8` | -           | see Table 1  | -     |
+| Name    | Offset | Length | Type    | Description | Value                      | Units |
+|---------|--------|--------|---------|-------------|----------------------------|-------|
+| `flags` | 0      | 1      | `uint8` | -           | [Table 1.1](#table-1-1)    | -     |
 
-#### Table 1 — `flags` bitfield
+<a id="table-1-1"></a>
+#### Table 1.1 — `flags` bitfield
 | Range | Name     |
 |-------|----------|
 | `0`   | `enabled`|

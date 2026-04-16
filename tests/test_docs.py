@@ -643,7 +643,7 @@ class TestGenerateMarkdown:
 
         md = result.read_text()
         # Single-service mode: Y.Z numbering (char 1, sub-table 1).
-        assert "see Table 1.1" in md
+        assert "[Table 1.1](#table-1-1)" in md
         assert "#### Table 1.1 —" in md
         assert "`flags` bitfield" in md
 
@@ -660,10 +660,72 @@ class TestGenerateMarkdown:
         md = result.read_text()
 
         # Each service's first characteristic's first sub-table.
-        assert "see Table 1.1.1" in md
+        assert "[Table 1.1.1](#table-1-1-1)" in md
         assert "#### Table 1.1.1 —" in md
-        assert "see Table 2.1.1" in md
+        assert "[Table 2.1.1](#table-2-1-1)" in md
         assert "#### Table 2.1.1 —" in md
+
+    def test_toc_and_anchors_single_mode(self, tmp_path):
+        """Single-service docs emit a flat char-only TOC plus anchors on each H3."""
+        yaml = _simple_schema_yaml() + """
+  pressure:
+    uuid: "12345678-1234-1234-1234-123456789002"
+    properties: [read]
+    permissions: [read]
+    payload:
+      value:
+        type: uint16
+"""
+        schema = self._load(tmp_path, "toc", yaml)
+        output = tmp_path / "docs" / "toc.md"
+        md = docs.generate(schema, output, fmt="md").read_text()
+
+        assert "## Contents" in md
+        assert "- [1. temperature](#char-test_service-temperature)" in md
+        assert "- [2. pressure](#char-test_service-pressure)" in md
+        # Anchor emitted immediately before the char H3.
+        assert '<a id="char-test_service-temperature"></a>\n### 1.' in md
+
+    def test_toc_includes_changelog_when_present(self, tmp_path):
+        """TOC lists a Changelog entry only for services that have changelog data."""
+        s1 = self._load(tmp_path, "s1", _simple_schema_yaml(
+            service_name="svc_a",
+            service_uuid="11111111-1111-1111-1111-111111111111",
+        ))
+        s2 = self._load(tmp_path, "s2", _simple_schema_yaml(
+            service_name="svc_b",
+            service_uuid="22222222-2222-2222-2222-222222222222",
+        ))
+        changelogs = {"svc_a": [{"revision": 1, "timestamp": "2026-04-15 10:00",
+                                 "message": "Init"}]}
+        output = tmp_path / "docs" / "combined.md"
+        md = docs.generate_combined([s1, s2], output, fmt="md",
+                                    changelogs=changelogs).read_text()
+
+        assert "  - [Changelog](#changelog-svc_a)" in md
+        assert "changelog-svc_b" not in md  # no changelog → no TOC entry, no anchor
+        assert '<a id="changelog-svc_a"></a>' in md
+
+    def test_toc_and_anchors_combined_mode(self, tmp_path):
+        """Combined docs emit a two-level TOC plus svc + char anchors."""
+        s1 = self._load(tmp_path, "s1", _simple_schema_yaml(
+            service_name="svc_a",
+            service_uuid="11111111-1111-1111-1111-111111111111",
+        ))
+        s2 = self._load(tmp_path, "s2", _simple_schema_yaml(
+            service_name="svc_b",
+            service_uuid="22222222-2222-2222-2222-222222222222",
+        ))
+        output = tmp_path / "docs" / "combined.md"
+        md = docs.generate_combined([s1, s2], output, fmt="md").read_text()
+
+        assert "## Contents" in md
+        assert "- [1. svc_a](#svc-svc_a)" in md
+        assert "  - [1.1 temperature](#char-svc_a-temperature)" in md
+        assert "- [2. svc_b](#svc-svc_b)" in md
+        assert "  - [2.1 temperature](#char-svc_b-temperature)" in md
+        assert '<a id="svc-svc_a"></a>\n# 1. svc_a' in md
+        assert '<a id="char-svc_b-temperature"></a>\n### 2.1' in md
 
     def test_structured_changelog_entry(self, tmp_path):
         schema = self._load(tmp_path, "test", _simple_schema_yaml())

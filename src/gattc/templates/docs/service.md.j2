@@ -3,13 +3,19 @@
 {{ (text or "-") | string | replace("|", "\\|") | replace("\n", " ") }}
 {%- endmacro -%}
 
-{#- Short marker for the Value column; complex values point to numbered appendices -#}
+{#- Anchor IDs. Explicit <a id> tags below each heading keep IDs stable regardless
+    of GFM slug rules and [NEW]/[CHANGED] status markers in heading text. -#}
+{%- macro svc_anchor(svc) -%}svc-{{ svc.service.name }}{%- endmacro -%}
+{%- macro char_anchor(svc, char) -%}char-{{ svc.service.name }}-{{ char.name }}{%- endmacro -%}
+{%- macro table_anchor(num) -%}table-{{ num | replace('.', '-') }}{%- endmacro -%}
+
+{#- Short marker for the Value column; complex values link to numbered sub-tables -#}
 {%- macro value_marker(field) -%}
-{%- if field.bits -%}see Table {{ field.bits_table }}
-{%- elif field["values"].type == "named" and field["values"]["items"] -%}see Table {{ field.values_table }}
+{%- if field.bits -%}[Table {{ field.bits_table }}](#{{ table_anchor(field.bits_table) }})
+{%- elif field["values"].type == "named" and field["values"]["items"] -%}[Table {{ field.values_table }}](#{{ table_anchor(field.values_table) }})
 {%- elif field["values"].type == "range" -%}{{ field["values"].display }}
 {%- elif field["values"].type == "text" -%}{{ cell(field["values"].display) }}
-{%- elif field.nested_fields -%}see Table {{ field.struct_table }}
+{%- elif field.nested_fields -%}[Table {{ field.struct_table }}](#{{ table_anchor(field.struct_table) }})
 {%- else -%}-{%- endif -%}
 {%- endmacro -%}
 
@@ -30,6 +36,7 @@
 {%- macro field_detail(field) -%}
 {%- if field.bits %}
 
+<a id="{{ table_anchor(field.bits_table) }}"></a>
 #### Table {{ field.bits_table }} — `{{ field.name }}` bitfield
 | Range | Name |
 |-------|------|
@@ -38,6 +45,7 @@
 {% endfor -%}
 {%- elif field["values"].type == "named" and field["values"]["items"] %}
 
+<a id="{{ table_anchor(field.values_table) }}"></a>
 #### Table {{ field.values_table }} — `{{ field.name }}` enum values
 | Value | Name |
 |-------|------|
@@ -47,6 +55,7 @@
 {%- endif -%}
 {%- if field.nested_fields %}
 
+<a id="{{ table_anchor(field.struct_table) }}"></a>
 #### Table {{ field.struct_table }} — `{{ field.name }}` struct layout
 | Name | Offset | Length | Type | Description | Value | Units |
 |------|--------|--------|------|-------------|-------|-------|
@@ -182,6 +191,7 @@
 
 {#- One service section -#}
 {%- macro render_service(svc, svc_idx) -%}
+<a id="{{ svc_anchor(svc) }}"></a>
 # {% if is_combined %}{{ svc_idx }}. {{ svc.service.name }}{% else %}Service: {{ svc.service.name }}{% endif %}
 
 - **UUID:** `{{ svc.service.uuid }}`
@@ -195,6 +205,7 @@
 
 {%- if svc.changelog %}
 
+<a id="changelog-{{ svc.service.name }}"></a>
 ## Changelog
 {% for entry in svc.changelog %}
 {{ render_changelog_entry(entry, svc, svc_idx) }}
@@ -206,6 +217,7 @@
 {% if not loop.first %}---
 
 {% endif -%}
+<a id="{{ char_anchor(svc, char) }}"></a>
 ### {% if is_combined %}{{ svc_idx }}.{{ svc.char_index[char.name] }}{% else %}{{ svc.char_index[char.name] }}.{% endif %} {{ name_with_status(char.name, char.change_status) }}
 
 - **UUID:** `{{ char.uuid }}`
@@ -229,7 +241,27 @@ _No payload defined._
 > **UNRELEASED** — run `gattc release` to update this document.
 
 {% endif -%}
-{%- for svc in services -%}
+## Contents
+{% if is_combined -%}
+{% for svc in services -%}
+- [{{ loop.index }}. {{ svc.service.name }}](#{{ svc_anchor(svc) }})
+{% set svc_idx = loop.index -%}
+{% if svc.changelog -%}
+{{ "  " }}- [Changelog](#changelog-{{ svc.service.name }})
+{% endif -%}
+{% for char in svc.characteristics -%}
+{{ "  " }}- [{{ svc_idx }}.{{ loop.index }} {{ char.name }}](#{{ char_anchor(svc, char) }})
+{% endfor -%}
+{% endfor -%}
+{% else -%}
+{% if services[0].changelog -%}
+- [Changelog](#changelog-{{ services[0].service.name }})
+{% endif -%}
+{% for char in services[0].characteristics -%}
+- [{{ loop.index }}. {{ char.name }}](#{{ char_anchor(services[0], char) }})
+{% endfor -%}
+{% endif %}
+{% for svc in services -%}
 {%- if not loop.first %}
 
 ---
