@@ -91,6 +91,8 @@ Produces: `docs/ble/gatt_services.md` (or `gatt_services.html` with `-f html`).
 
 Markdown is a better default for contract-first sharing; HTML is preferable when you want a polished, self-contained artifact to open in a browser.
 
+> **Note:** the Markdown output targets GitHub Flavored Markdown — pipe tables and raw `<a id>` anchor tags. Strict CommonMark renderers will show the anchor tags as literal text and won't parse the tables.
+
 ## Generated Content
 
 Both formats include the same information:

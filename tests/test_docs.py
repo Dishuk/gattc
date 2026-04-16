@@ -1,5 +1,6 @@
 """Tests for the Markdown/HTML documentation generator."""
 
+import re
 import pytest
 from pathlib import Path
 
@@ -618,6 +619,46 @@ characteristics:
 """
 
 
+# Rich schema: exercises all three sub-table kinds (bits / named values /
+# nested struct) and more than one sub-table on a single characteristic,
+# so anchor/reference consistency tests hit every branch of the walk.
+_RICH_SCHEMA_YAML = """
+schema_version: "1.0"
+
+service:
+  name: rich_service
+  uuid: "cccccccc-cccc-cccc-cccc-cccccccccccc"
+
+characteristics:
+  combo:
+    uuid: "cccccccc-cccc-cccc-cccc-000000000001"
+    properties: [read]
+    permissions: [read]
+    payload:
+      flags:
+        type: uint8
+        bits:
+          0: ready
+          1-3: mode
+      opcode:
+        type: uint8
+        values:
+          0: "reset"
+          1: "start"
+          2: "stop"
+
+  samples_char:
+    uuid: "cccccccc-cccc-cccc-cccc-000000000002"
+    properties: [notify]
+    permissions: [read]
+    payload:
+      count: uint8
+      samples[]:
+        x: uint16
+        y: uint16
+"""
+
+
 class TestGenerateMarkdown:
     def _load(self, tmp_path, name, yaml_content):
         path = tmp_path / f"{name}.yaml"
@@ -664,6 +705,53 @@ class TestGenerateMarkdown:
         assert "#### Table 1.1.1 —" in md
         assert "[Table 2.1.1](#table-2-1-1)" in md
         assert "#### Table 2.1.1 —" in md
+
+    def test_table_references_resolve_to_anchors(self, tmp_path):
+        """Every `#table-X...` link must have a matching `<a id="table-X...">`.
+
+        Guards against the walk-order coupling between docs.py's
+        `_assign_table_numbers` and service.md.j2: if either reorders
+        its traversal, sub-table references silently point to the wrong
+        (or nonexistent) anchor. Runs in both single and combined mode
+        to cover Y.Z and X.Y.Z numbering.
+        """
+        link_re = re.compile(r"\(#(table-[\w-]+)\)")
+        anchor_re = re.compile(r'<a id="(table-[\w-]+)"></a>')
+
+        def check(md: str, min_tables: int) -> None:
+            links = set(link_re.findall(md))
+            anchors = set(anchor_re.findall(md))
+            # Sanity: the fixture must actually produce sub-tables, else the
+            # test would pass vacuously on any future template that stops
+            # emitting them.
+            assert len(anchors) >= min_tables, (
+                f"expected at least {min_tables} anchors, got {len(anchors)}"
+            )
+            assert links == anchors, (
+                f"link/anchor mismatch:\n"
+                f"  links without anchors: {links - anchors}\n"
+                f"  anchors without links: {anchors - links}"
+            )
+
+        # Single-service: combo char has bits + named values (2 sub-tables),
+        # samples_char has nested struct (1 sub-table) → 3 total.
+        schema = self._load(tmp_path, "rich", _RICH_SCHEMA_YAML)
+        single_md = docs.generate(
+            schema, tmp_path / "rich.md", fmt="md"
+        ).read_text()
+        check(single_md, min_tables=3)
+
+        # Combined mode doubles it and switches numbering to X.Y.Z.
+        schema2 = self._load(
+            tmp_path, "rich2",
+            _RICH_SCHEMA_YAML
+                .replace("rich_service", "rich_service_2")
+                .replace("cccccccc", "dddddddd"),
+        )
+        combined_md = docs.generate_combined(
+            [schema, schema2], tmp_path / "combined.md", fmt="md"
+        ).read_text()
+        check(combined_md, min_tables=6)
 
     def test_toc_and_anchors_single_mode(self, tmp_path):
         """Single-service docs emit a flat char-only TOC plus anchors on each H3."""
