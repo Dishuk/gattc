@@ -315,7 +315,7 @@ void send_sensor_update(uint16_t value)
     my_service_sensor_data_t buf;
     my_service_sensor_data_pack(&buf, value);
 
-    bt_gatt_notify(NULL, &my_service_svc.attrs[SENSOR_DATA_ATTR_INDEX],
+    bt_gatt_notify(NULL, &my_service_svc.attrs[MY_SERVICE_SENSOR_DATA_VAL_ATTR_IDX],
                    &buf, sizeof(buf));
 }
 ```

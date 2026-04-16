@@ -1,5 +1,7 @@
 """Tests for Zephyr code generator."""
 
+import re
+
 import pytest
 from pathlib import Path
 from gattc.schema import load_schema
@@ -261,6 +263,114 @@ characteristics:
         # Check source includes the header correctly
         source = source_path.read_text()
         assert '#include "test_service.h"' in source
+
+    def test_val_attr_idx_shifts_across_ccc(self, tmp_path):
+        """First char with notify inserts a CCC attr, shifting the second char's value index."""
+        schema_content = """
+schema_version: "1.0"
+
+service:
+  name: test_service
+  uuid: "12345678-1234-1234-1234-123456789abc"
+
+characteristics:
+  alpha:
+    uuid: "12345678-1234-1234-1234-123456789001"
+    properties: [read, notify]
+    permissions: [read]
+    payload:
+      value: int16
+  beta:
+    uuid: "12345678-1234-1234-1234-123456789002"
+    properties: [read]
+    permissions: [read]
+    payload:
+      value: int16
+"""
+        schema_file = tmp_path / "test.yaml"
+        schema_file.write_text(schema_content)
+
+        schema = load_schema(schema_file)
+        header_path, _ = zephyr.generate(schema, tmp_path / "generated" / "test_service")
+        header = header_path.read_text()
+
+        assert "#define TEST_SERVICE_ALPHA_VAL_ATTR_IDX 2" in header
+        assert "#define TEST_SERVICE_BETA_VAL_ATTR_IDX 5" in header
+        assert "extern const struct bt_gatt_service_static test_service_svc;" in header
+
+    def test_val_attr_idx_matches_source_layout(self, tmp_path):
+        """Each VAL_ATTR_IDX must match the characteristic's actual position in the source.
+
+        Guards against silent drift if source.c.j2 gains another BT_GATT_* macro
+        that contributes attributes (e.g., BT_GATT_CUD) without the val_attr_idx
+        calculation being updated.
+        """
+        schema_content = """
+schema_version: "1.0"
+
+service:
+  name: test_service
+  uuid: "12345678-1234-1234-1234-123456789abc"
+
+characteristics:
+  alpha:
+    uuid: "12345678-1234-1234-1234-123456789001"
+    properties: [read, notify]
+    permissions: [read]
+    payload:
+      value: int16
+  beta:
+    uuid: "12345678-1234-1234-1234-123456789002"
+    properties: [read, indicate]
+    permissions: [read]
+    payload:
+      value: int16
+  gamma:
+    uuid: "12345678-1234-1234-1234-123456789003"
+    properties: [read]
+    permissions: [read]
+    payload:
+      value: int16
+"""
+        schema_file = tmp_path / "test.yaml"
+        schema_file.write_text(schema_content)
+
+        schema = load_schema(schema_file)
+        header_path, source_path = zephyr.generate(schema, tmp_path / "generated" / "test_service")
+        header = header_path.read_text()
+        source = source_path.read_text()
+
+        body_match = re.search(r"BT_GATT_SERVICE_DEFINE\s*\([^,]+,(.*?)\);", source, re.DOTALL)
+        assert body_match, "BT_GATT_SERVICE_DEFINE not found in generated source"
+
+        # Attrs each known BT_GATT_* macro contributes (Zephyr API contract).
+        attr_counts = {
+            "PRIMARY_SERVICE": 1,
+            "CHARACTERISTIC": 2,
+            "CCC": 1,
+        }
+
+        macros = re.findall(r"BT_GATT_([A-Z_]+)\s*\(", body_match.group(1))
+        unknown = [m for m in macros if m not in attr_counts]
+        assert not unknown, (
+            f"Unknown BT_GATT_{unknown[0]} in source template — update attr_counts "
+            f"here and _char_attr_count in generators/zephyr.py"
+        )
+
+        pos = 0
+        char_names = [c.name.upper() for c in schema.characteristics]
+        char_idx = 0
+        for m in macros:
+            if m == "CHARACTERISTIC":
+                expected = pos + 1
+                assert f"#define TEST_SERVICE_{char_names[char_idx]}_VAL_ATTR_IDX {expected}" in header, (
+                    f"Header VAL_ATTR_IDX for {char_names[char_idx]} disagrees with source "
+                    f"(expected {expected})"
+                )
+                char_idx += 1
+            pos += attr_counts[m]
+
+        assert char_idx == len(char_names)
 
 
 class TestZephyrCombinedGenerator:

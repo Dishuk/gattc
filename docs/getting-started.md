@@ -163,7 +163,8 @@ void send_notification(int16_t temp, uint8_t flags)
 {
     temperature_service_temperature_t payload;
     temperature_service_temperature_pack(&payload, temp, flags);
-    bt_gatt_notify(NULL, &temperature_service_svc.attrs[1], &payload, sizeof(payload));
+    bt_gatt_notify(NULL, &temperature_service_svc.attrs[TEMPERATURE_SERVICE_TEMPERATURE_VAL_ATTR_IDX],
+                   &payload, sizeof(payload));
 }
 ```
 

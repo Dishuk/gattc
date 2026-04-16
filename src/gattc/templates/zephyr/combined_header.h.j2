@@ -32,8 +32,11 @@
     {{ char.uuid_encoded }}
 #define {{ svc.service_upper }}_{{ char.name_upper }}_UUID \
     BT_UUID_DECLARE_128({{ svc.service_upper }}_{{ char.name_upper }}_UUID_VAL)
+#define {{ svc.service_upper }}_{{ char.name_upper }}_VAL_ATTR_IDX {{ char.val_attr_idx }}
 
 {% endfor -%}
+extern const struct bt_gatt_service_static {{ svc.service_name }}_svc;
+
 /*------------------------------ Payloads ------------------------------*/
 
 {% for payload in svc.payloads -%}

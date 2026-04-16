@@ -92,6 +92,20 @@ def _needs_ccc(char: Characteristic) -> bool:
     return "notify" in char.properties or "indicate" in char.properties
 
 
+# GATT attribute table layout per Zephyr macro contract. Keep in sync with
+# source.c.j2: any new BT_GATT_* macro emitted there must be accounted for here,
+# and test_val_attr_idx_matches_source_layout will fail loudly if it isn't.
+_ATTRS_PER_PRIMARY_SERVICE = 1
+_ATTRS_PER_CHAR = 2  # BT_GATT_CHARACTERISTIC emits declaration + value
+_ATTRS_PER_CCC = 1
+_CHAR_VAL_OFFSET = 1  # Value attr's position within a BT_GATT_CHARACTERISTIC block
+
+
+def _char_attr_count(char: Characteristic) -> int:
+    """Total GATT attrs contributed by a characteristic and its optional CCC."""
+    return _ATTRS_PER_CHAR + (_ATTRS_PER_CCC if _needs_ccc(char) else 0)
+
+
 def _format_ccc_permissions(perms: List[str]) -> str:
     """Derive CCC permissions from characteristic permissions.
 
@@ -463,12 +477,15 @@ def _build_header_context(schema: Schema) -> dict:
     service_upper = service_name.upper()
 
     characteristics = []
+    val_attr_idx = _ATTRS_PER_PRIMARY_SERVICE + _CHAR_VAL_OFFSET
     for char in schema.characteristics:
         characteristics.append({
             "name": char.name,
             "name_upper": char.name.upper(),
             "uuid_encoded": _format_uuid_128(char.uuid),
+            "val_attr_idx": val_attr_idx,
         })
+        val_attr_idx += _char_attr_count(char)
 
     payloads = []
     for char in schema.characteristics:
