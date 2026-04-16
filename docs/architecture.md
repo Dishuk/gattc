@@ -110,7 +110,6 @@ Stores JSON snapshots of compiled schemas for change tracking:
 
 - `save_snapshot()` - Serializes current schema to JSON
 - `load_snapshot()` - Loads previous snapshot for comparison
-- Backup mechanism with `.prev.json` files for revert support
 - Default location: `gattc/snapshots/`, configurable in `gattc.yaml`
 
 ### Change Detection (`diff.py`)

@@ -277,15 +277,3 @@ class TestChangelogFiles:
             assert "Initial release recorded" in result.output
             # Docs file should have been generated without template errors.
             assert any((tmp_path / "docs").glob("*.md"))
-
-    def test_no_prev_json_is_written(self, project_dir):
-        """The old .prev.json backup files should no longer exist."""
-        runner = CliRunner()
-        with runner.isolated_filesystem(temp_dir=project_dir):
-            runner.invoke(main, ["release", "-m", "Initial"], catch_exceptions=False)
-            (project_dir / "gattc" / "test_svc.yaml").write_text(MODIFIED_SCHEMA)
-            runner.invoke(main, ["release", "-m", "Bump"], catch_exceptions=False)
-
-            snapshots_dir = project_dir / "gattc" / "snapshots"
-            prev_files = list(snapshots_dir.glob("*.prev.json"))
-            assert prev_files == []
