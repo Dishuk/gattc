@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Emit `<SERVICE>_<CHAR>_VAL_ATTR_IDX` macros in Zephyr headers so firmware can index the GATT attribute table without hand-counting.
+- Emit `extern const struct bt_gatt_service_static <service>_svc;` in Zephyr headers so the service handle is usable from other translation units.
+
 ## [0.3.0] - 2026-04-16
 
 ### Added
