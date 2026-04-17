@@ -14,6 +14,11 @@ from ..schema import Field, PAYLOAD_TYPES, Payload, Schema
 from ..diff import SchemaDiff, SERVICE_CHANGE_LABELS, SERVICE_CHANGE_ROW_LABELS
 
 
+def _title_case(name: str) -> str:
+    """Display-only title; anchors/IDs still use the raw identifier."""
+    return " ".join(word[:1].upper() + word[1:] for word in name.split("_") if word)
+
+
 def _validate_changelog(changelog: Optional[List[Dict[str, Any]]]) -> None:
     """Crash loudly on unknown service_change tags before the template silently
     renders them as empty strings."""
@@ -190,6 +195,7 @@ def _build_docs_context(
 
         char_data = {
             "name": char.name,
+            "title": _title_case(char.name),
             "uuid": char.uuid,
             "description": char.description,
             "properties": char.properties,
@@ -202,6 +208,7 @@ def _build_docs_context(
     ctx = {
         "service": {
             "name": schema.service.name,
+            "title": _title_case(schema.service.name),
             "uuid": schema.service.uuid,
             "description": schema.service.description,
             "schema_version": schema.schema_version,

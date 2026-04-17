@@ -356,14 +356,14 @@
             <div class="nav-section">
                 <h4 class="nav-service-title" data-service="{{ svc.service.name }}">
                     <span class="arrow">&#9660;</span>
-                    <a href="#{{ svc.service.name }}-service-info" class="nav-link service-link">{{ svc.service.name }}</a>
+                    <a href="#{{ svc.service.name }}-service-info" class="nav-link service-link">{{ svc.service.title }}</a>
                 </h4>
                 <ul class="nav-list" id="nav-{{ svc.service.name }}">
 {%- if svc.changelog %}
                     <li class="nav-item"><a href="#{{ svc.service.name }}-changelog" class="nav-link">Changelog</a></li>
 {%- endif %}
 {%- for char in svc.characteristics %}
-                    <li class="nav-item"><a href="#{{ svc.service.name }}-{{ char.name }}" class="nav-link">{{ char.name }}</a></li>
+                    <li class="nav-item"><a href="#{{ svc.service.name }}-{{ char.name }}" class="nav-link">{{ char.title }}</a></li>
 {%- endfor %}
                 </ul>
             </div>
@@ -371,7 +371,7 @@
 {%- else %}
             <h4 class="nav-title">Service</h4>
             <ul class="nav-list">
-                <li class="nav-item"><a href="#service-info" class="nav-link">{{ services[0].service.name }}</a></li>
+                <li class="nav-item"><a href="#service-info" class="nav-link">{{ services[0].service.title }}</a></li>
             </ul>
 {%- if services[0].changelog %}
             <h4 class="nav-title">Changelog</h4>
@@ -382,7 +382,7 @@
             <h4 class="nav-title">Characteristics</h4>
             <ul class="nav-list">
 {%- for char in services[0].characteristics %}
-                <li class="nav-item"><a href="#{{ char.name }}" class="nav-link">{{ char.name }}</a></li>
+                <li class="nav-item"><a href="#{{ char.name }}" class="nav-link">{{ char.title }}</a></li>
 {%- endfor %}
             </ul>
 {%- endif %}
@@ -394,7 +394,7 @@
             <section class="service-section" id="{{ svc.service.name }}">
 {%- endif %}
 
-            <h2 id="{% if is_combined %}{{ svc.service.name }}-{% endif %}service-info">Service: <span class="service-name">{{ svc.service.name }}</span></h2>
+            <h2 id="{% if is_combined %}{{ svc.service.name }}-{% endif %}service-info">Service: <span class="service-name">{{ svc.service.title }}</span></h2>
             <div class="service-info">
                 <div class="meta-item">
                     <span class="meta-label">UUID:</span>
@@ -488,7 +488,7 @@ Schema revision: {{ entry.schema_revision.old|default('none') }} -> {{ entry.sch
 
             <div class="characteristic" id="{% if is_combined %}{{ svc.service.name }}-{% endif %}{{ char.name }}">
                 <div class="characteristic-header">
-                    <h3>{{ char.name }}{% if char.change_status == 'added' %}<span class="badge badge-new">NEW</span>{% elif char.change_status == 'modified' %}<span class="badge badge-changed">CHANGED</span>{% elif char.change_status == 'removed' %}<span class="badge badge-removed">REMOVED</span>{% endif %}</h3>
+                    <h3>{{ char.title }}{% if char.change_status == 'added' %}<span class="badge badge-new">NEW</span>{% elif char.change_status == 'modified' %}<span class="badge badge-changed">CHANGED</span>{% elif char.change_status == 'removed' %}<span class="badge badge-removed">REMOVED</span>{% endif %}</h3>
                     <div class="characteristic-meta">
                         <div class="meta-item">
                             <span class="meta-label">UUID:</span>

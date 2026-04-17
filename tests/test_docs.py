@@ -10,6 +10,7 @@ from gattc.schema import (
 from gattc.diff import SchemaDiff, CharacteristicChange, FieldChange
 from gattc.generators import docs
 from gattc.generators.docs import (
+    _title_case,
     _format_type,
     _format_bits,
     _compute_field_length,
@@ -72,6 +73,24 @@ characteristics:
         unit: celsius_x100
         description: "Temperature value"
 """
+
+
+# ---------------------------------------------------------------------------
+# Unit tests: _title_case
+# ---------------------------------------------------------------------------
+
+class TestTitleCase:
+    @pytest.mark.parametrize("raw,expected", [
+        ("heart_rate", "Heart Rate"),
+        ("temperature", "Temperature"),
+        ("foo__bar", "Foo Bar"),
+        ("trailing_", "Trailing"),
+        ("HRM", "HRM"),
+        ("ble_HRM", "Ble HRM"),
+        ("", ""),
+    ])
+    def test_title_case(self, raw, expected):
+        assert _title_case(raw) == expected
 
 
 # ---------------------------------------------------------------------------
@@ -769,8 +788,8 @@ class TestGenerateMarkdown:
         md = docs.generate(schema, output, fmt="md").read_text()
 
         assert "## Contents" in md
-        assert "- [1. temperature](#char-test_service-temperature)" in md
-        assert "- [2. pressure](#char-test_service-pressure)" in md
+        assert "- [1. Temperature](#char-test_service-temperature)" in md
+        assert "- [2. Pressure](#char-test_service-pressure)" in md
         # Anchor emitted immediately before the char H3.
         assert '<a id="char-test_service-temperature"></a>\n### 1.' in md
 
@@ -808,11 +827,11 @@ class TestGenerateMarkdown:
         md = docs.generate_combined([s1, s2], output, fmt="md").read_text()
 
         assert "## Contents" in md
-        assert "- [1. svc_a](#svc-svc_a)" in md
-        assert "  - [1.1 temperature](#char-svc_a-temperature)" in md
-        assert "- [2. svc_b](#svc-svc_b)" in md
-        assert "  - [2.1 temperature](#char-svc_b-temperature)" in md
-        assert '<a id="svc-svc_a"></a>\n# 1. svc_a' in md
+        assert "- [1. Svc A](#svc-svc_a)" in md
+        assert "  - [1.1 Temperature](#char-svc_a-temperature)" in md
+        assert "- [2. Svc B](#svc-svc_b)" in md
+        assert "  - [2.1 Temperature](#char-svc_b-temperature)" in md
+        assert '<a id="svc-svc_a"></a>\n# 1. Svc A' in md
         assert '<a id="char-svc_b-temperature"></a>\n### 2.1' in md
 
     def test_structured_changelog_entry(self, tmp_path):
@@ -923,9 +942,9 @@ class TestGenerateMarkdown:
         result = docs.generate_combined([schema1, schema2], output, fmt="md")
 
         md = result.read_text()
-        assert "# 1. service_alpha" in md
-        assert "# 2. service_beta" in md
+        assert "# 1. Service Alpha" in md
+        assert "# 2. Service Beta" in md
         assert "\n---\n" in md  # service separator
         # Characteristics numbered as <service>.<char> in combined mode
-        assert "### 1.1 temperature" in md
-        assert "### 2.1 temperature" in md
+        assert "### 1.1 Temperature" in md
+        assert "### 2.1 Temperature" in md

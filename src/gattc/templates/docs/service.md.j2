@@ -192,7 +192,7 @@
 {#- One service section -#}
 {%- macro render_service(svc, svc_idx) -%}
 <a id="{{ svc_anchor(svc) }}"></a>
-# {% if is_combined %}{{ svc_idx }}. {{ svc.service.name }}{% else %}Service: {{ svc.service.name }}{% endif %}
+# {% if is_combined %}{{ svc_idx }}. {{ svc.service.title }}{% else %}Service: {{ svc.service.title }}{% endif %}
 
 - **UUID:** `{{ svc.service.uuid }}`
 {%- if svc.service.schema_version or svc.service.schema_revision %}
@@ -218,7 +218,7 @@
 
 {% endif -%}
 <a id="{{ char_anchor(svc, char) }}"></a>
-### {% if is_combined %}{{ svc_idx }}.{{ svc.char_index[char.name] }}{% else %}{{ svc.char_index[char.name] }}.{% endif %} {{ name_with_status(char.name, char.change_status) }}
+### {% if is_combined %}{{ svc_idx }}.{{ svc.char_index[char.name] }}{% else %}{{ svc.char_index[char.name] }}.{% endif %} {{ name_with_status(char.title, char.change_status) }}
 
 - **UUID:** `{{ char.uuid }}`
 - **Properties:** {% for prop in char.properties %}`{{ prop }}`{% if not loop.last %}, {% endif %}{% endfor %}
@@ -244,13 +244,13 @@ _No payload defined._
 ## Contents
 {% if is_combined -%}
 {% for svc in services -%}
-- [{{ loop.index }}. {{ svc.service.name }}](#{{ svc_anchor(svc) }})
+- [{{ loop.index }}. {{ svc.service.title }}](#{{ svc_anchor(svc) }})
 {% set svc_idx = loop.index -%}
 {% if svc.changelog -%}
 {{ "  " }}- [Changelog](#changelog-{{ svc.service.name }})
 {% endif -%}
 {% for char in svc.characteristics -%}
-{{ "  " }}- [{{ svc_idx }}.{{ loop.index }} {{ char.name }}](#{{ char_anchor(svc, char) }})
+{{ "  " }}- [{{ svc_idx }}.{{ loop.index }} {{ char.title }}](#{{ char_anchor(svc, char) }})
 {% endfor -%}
 {% endfor -%}
 {% else -%}
@@ -258,7 +258,7 @@ _No payload defined._
 - [Changelog](#changelog-{{ services[0].service.name }})
 {% endif -%}
 {% for char in services[0].characteristics -%}
-- [{{ loop.index }}. {{ char.name }}](#{{ char_anchor(services[0], char) }})
+- [{{ loop.index }}. {{ char.title }}](#{{ char_anchor(services[0], char) }})
 {% endfor -%}
 {% endif %}
 {% for svc in services -%}

@@ -112,7 +112,7 @@ gattc docs -o docs/ble/ -f html
 gattc compile --docs
 ```
 
-Generates one file per service with characteristic tables, payload layouts, bitfield definitions, and value descriptions. Markdown is the default (git-friendly, renders on GitHub); set `output.docs.format: html` in `gattc.yaml` for a styled standalone HTML page.
+Generates one file per service with characteristic tables, payload layouts, bitfield definitions, and value descriptions. Markdown is the default; set `output.docs.format: html` in `gattc.yaml` for a styled standalone HTML page.
 
 ## Using Generated Code
 
