@@ -1,5 +1,20 @@
 # Getting Started
 
+- [Prerequisites](#prerequisites)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+  - [1. Initialize Project](#1-initialize-project)
+  - [2. Define a Service](#2-define-a-service)
+  - [3. Validate Schema](#3-validate-schema)
+  - [4. Generate Code](#4-generate-code)
+  - [5. Generate Documentation](#5-generate-documentation)
+- [Using Generated Code](#using-generated-code)
+- [Schema Features](#schema-features)
+- [Release Tracking](#release-tracking)
+- [Project Configuration](#project-configuration)
+- [Build Integration](#build-integration)
+- [Reference](#reference)
+
 ## Prerequisites
 
 - Python >= 3.10
@@ -299,8 +314,8 @@ Running `gattc release` clears the banner and adds change highlighting (green fo
 ### Writing a Release Message
 
 Omit `-m` and `gattc release` opens `$EDITOR` — prefilled with the detected
-structural changes as comments — so you can write a longer message, much like
-`git commit`. Save and close to record; exit with an empty message to abort.
+structural changes as comments — to allow a longer message, much like
+`git commit`. Saving and closing records the release; exiting with an empty message aborts it.
 
 ### Editing the Changelog
 
@@ -333,7 +348,7 @@ gattc changelog edit 2
 The same default applies to `gattc changelog path` — omit the revision to get
 the path to the latest entry.
 
-You can also edit the `.md` changelog files directly. Changes are picked up by `gattc docs` and appear in the generated documentation.
+The `.md` changelog files can also be edited directly. Changes are picked up by `gattc docs` and appear in the generated documentation.
 
 Use `gattc changelog` (or `gattc changelog list`) to see all revisions.
 

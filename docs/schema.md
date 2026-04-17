@@ -1,5 +1,27 @@
 # Schema Specification
 
+- [Top-Level Structure](#top-level-structure)
+- [Service Definition](#service-definition)
+- [Characteristic Definition](#characteristic-definition)
+  - [Properties](#properties)
+  - [Permissions](#permissions)
+- [Data Types](#data-types)
+  - [Standard Types](#standard-types)
+  - [Big-Endian Types](#big-endian-types)
+  - [Raw Bytes](#raw-bytes)
+  - [Arrays](#arrays)
+- [Payload Definition](#payload-definition)
+  - [Field Syntax](#field-syntax)
+  - [Auto-Computed Offsets](#auto-computed-offsets)
+  - [Bitfields](#bitfields)
+  - [Field Metadata](#field-metadata)
+  - [Values](#values)
+  - [Units](#units)
+- [Directional Payloads](#directional-payloads)
+- [Repeated Structs](#repeated-structs)
+- [Variable-Length Payloads](#variable-length-payloads)
+- [Validation Rules](#validation-rules)
+
 ## Top-Level Structure
 
 ```yaml

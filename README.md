@@ -81,7 +81,7 @@ gattc/
 | [Configuration](docs/config.md) | Project configuration (`gattc.yaml`) |
 | [Schema Specification](docs/schema.md) | YAML schema format, data types, field syntax |
 | [CLI Reference](docs/cli.md) | Command-line usage and options |
-| [Code Generation](docs/codegen.md) | What gets generated, philosophy, resource considerations |
+| [Code Generation](docs/codegen.md) | What gets generated, drift detection, resource considerations |
 | [Documentation Generation](docs/docgen.md) | Markdown (default) or HTML documentation output |
 | [Architecture](docs/architecture.md) | System design, components, data flow |
 | [Development](docs/development.md) | Build commands, testing, contributing |

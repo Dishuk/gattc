@@ -1,5 +1,17 @@
 # CLI Reference
 
+- [Installation](#installation)
+- [Global Options](#global-options)
+- [Commands](#commands)
+  - [init](#init)
+  - [compile](#compile)
+  - [check](#check)
+  - [docs](#docs)
+  - [release](#release)
+  - [changelog](#changelog)
+- [Exit Codes](#exit-codes)
+- [Build Integration](#build-integration)
+
 ## Installation
 
 ```bash
@@ -290,11 +302,3 @@ gattc compile
 git diff --exit-code src/generated/ || \
     (echo "Generated files out of sync" && exit 1)
 ```
-
-## Future Commands
-
-Planned but not yet implemented:
-
-- `gattc compile --watch` - Watch mode for development
-- `gattc compile --dry-run` - Check without writing files
-- `gattc diff` - Show changes between schema versions (standalone)

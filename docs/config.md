@@ -2,6 +2,17 @@
 
 Project configuration file `gattc.yaml` defines schemas location and output paths.
 
+- [File Location](#file-location)
+- [Minimal Example](#minimal-example)
+- [Full Example](#full-example)
+- [Fields](#fields)
+  - [schemas](#schemas)
+  - [output](#output)
+  - [services](#services)
+  - [snapshots](#snapshots)
+- [CLI Override](#cli-override)
+- [Directory Structure](#directory-structure)
+
 ## File Location
 
 gattc searches for `gattc.yaml` in the current directory and parent directories. Place it in the project root.

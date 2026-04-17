@@ -1,12 +1,12 @@
 # Code Generation
 
-## Philosophy
-
-**Provide tools, not restrictions.**
-
-- Developer CAN use generated utilities -> guaranteed schema sync
-- Developer CAN ignore them -> full freedom, manual responsibility
-- No forced patterns, no wrapper requirements
+- [What Gets Generated](#what-gets-generated)
+- [Usage](#usage)
+- [How Drift is Caught](#how-drift-is-caught)
+- [Variable-Length Payloads](#variable-length-payloads)
+- [Resource Considerations](#resource-considerations)
+- [Attribute Table Access](#attribute-table-access)
+- [Notify/Indicate Support](#notifyindicate-support)
 
 ## What Gets Generated
 
@@ -66,7 +66,7 @@ static inline void my_service_shock_threshold_unpack(
 }
 ```
 
-## Developer Usage
+## Usage
 
 ### Sending data (read/notify)
 
@@ -92,7 +92,7 @@ ssize_t shock_thresh_write_cb(struct bt_conn *conn, ..., const void *buf, ...) {
 ### Or ignore utilities entirely
 
 ```c
-// Developer can still do manual packing
+// Manual packing is still possible
 uint16_t value = sys_le16_to_cpu(*(uint16_t*)buf);
 ```
 
@@ -115,7 +115,7 @@ void my_service_shock_threshold_pack(
     uint8_t sensitivity)   // NEW PARAMETER
 ```
 
-**Developer's old code:**
+**Existing call site:**
 
 ```c
 my_service_shock_threshold_pack(&buf, get_threshold());
@@ -166,8 +166,6 @@ static inline size_t my_service_sensor_data_items_per_mtu(uint16_t mtu);
 ```
 
 ## Resource Considerations
-
-Embedded systems have limited ROM/RAM.
 
 ### Cost Analysis
 
@@ -251,7 +249,7 @@ For every characteristic, the header defines a macro giving the index of that ch
 #define MY_SERVICE_SENSOR_DATA_VAL_ATTR_IDX 2
 ```
 
-Use it whenever you need a `struct bt_gatt_attr *` for the characteristic — for example with `bt_gatt_notify()`, `bt_gatt_indicate()`, or attribute lookups — instead of hand-counting or hard-coding an index. Adding or removing characteristics (or their CCCs) updates the macro automatically, so the caller stays in sync with the table layout.
+Use it wherever a `struct bt_gatt_attr *` for the characteristic is needed — for example with `bt_gatt_notify()`, `bt_gatt_indicate()`, or attribute lookups — instead of hand-counting or hard-coding an index. Adding or removing characteristics (or their CCCs) updates the macro automatically, so callers stay in sync with the table layout.
 
 ## Notify/Indicate Support
 

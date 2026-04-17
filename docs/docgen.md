@@ -2,6 +2,20 @@
 
 Generate documentation from GATT schemas for sharing with mobile teams, creating ICDs, or internal reference. **Markdown is the default output**; HTML is available as an opt-in.
 
+- [Quick Start](#quick-start)
+- [CLI Reference](#cli-reference)
+  - [Format resolution](#format-resolution)
+- [Configuration](#configuration)
+- [Output Modes](#output-modes)
+  - [Per-Service (default)](#per-service-default)
+  - [Combined](#combined)
+- [Markdown vs HTML](#markdown-vs-html)
+- [Generated Content](#generated-content)
+- [Integration with Compile](#integration-with-compile)
+- [Schema Features for Documentation](#schema-features-for-documentation)
+- [Example Output](#example-output)
+- [Generating Both Formats](#generating-both-formats)
+
 ## Quick Start
 
 ```bash
@@ -89,7 +103,7 @@ Produces: `docs/ble/gatt_services.md` (or `gatt_services.html` with `-f html`).
 | Standalone styling & theming | — | ✅ self-contained, dark mode, search |
 | Nested tables | simulated via numbered appendix tables | native nested tables |
 
-Markdown is a better default for contract-first sharing; HTML is preferable when you want a polished, self-contained artifact to open in a browser.
+Markdown is a better default for contract-first sharing; HTML is preferable when a polished, self-contained artifact is needed for browser viewing.
 
 > **Note:** the Markdown output targets GitHub Flavored Markdown — pipe tables and raw `<a id>` anchor tags. Strict CommonMark renderers will show the anchor tags as literal text and won't parse the tables.
 
@@ -191,7 +205,7 @@ HTML renders the bitfield as an inline nested table under the main row.
 
 ## Generating Both Formats
 
-`gattc compile` and `gattc release` only clear files in the *currently configured* format. This means you can keep Markdown and HTML outputs side-by-side in the same directory — useful when you want MD for git reviews and HTML for browser viewing:
+`gattc compile` and `gattc release` only clear files in the *currently configured* format. This means Markdown and HTML outputs can coexist in the same directory — useful when MD is preferred for git reviews and HTML for browser viewing:
 
 ```bash
 # Generate both (MD from config, HTML on demand)
@@ -201,4 +215,4 @@ gattc docs -f html -o docs/ble/         # writes docs/ble/*.html, leaves .md unt
 
 Each invocation only touches files in its own format, so mixing formats in one directory is safe.
 
-**Caveat:** this also means that if you *change* the configured format (`format: md` → `format: html`), the old files from the previous format aren't removed automatically. Delete them yourself if you don't want stale copies hanging around.
+**Caveat:** this also means that *changing* the configured format (`format: md` → `format: html`) does not automatically remove old files from the previous format. Delete them manually to avoid stale copies.

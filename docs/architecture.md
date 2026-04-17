@@ -1,5 +1,18 @@
 # Architecture
 
+- [System Overview](#system-overview)
+- [Data Flow](#data-flow)
+- [Components](#components)
+  - [CLI](#cli-clipy)
+  - [Schema Parser](#schema-parser-schemapy)
+  - [Validator](#validator-schemapy)
+  - [Snapshot System](#snapshot-system-snapshotpy)
+  - [Change Detection](#change-detection-diffpy)
+  - [Release History](#release-history-changelogpy)
+  - [Generators](#generators-generators)
+- [File Structure](#file-structure)
+- [Error Handling](#error-handling)
+
 ## System Overview
 
 **CLI** (click) &rarr; **Core** (parser, validator, config, snapshots) &rarr; **Generators** (zephyr, docs)
@@ -210,10 +223,3 @@ Bit 9 in 'status.flags' exceeds type size (max bit: 7)
 ```
 
 Use `--debug` for full Python tracebacks on unexpected errors.
-
-## Future Components (Nice-to-Have)
-
-The following generators are optional enhancements, not requirements:
-
-- **TypeScript Generator**: Type definitions for web/mobile
-- **Swift Generator**: iOS type definitions

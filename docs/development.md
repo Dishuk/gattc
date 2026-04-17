@@ -1,5 +1,17 @@
 # Development Guide
 
+- [Setup](#setup)
+- [Build Commands](#build-commands)
+- [Project Structure](#project-structure)
+- [Key Components](#key-components)
+  - [schema.py](#schemapy)
+  - [generators/zephyr.py](#generatorszephyrpy)
+- [Adding a New Type](#adding-a-new-type)
+- [Adding a New Generator](#adding-a-new-generator)
+- [Testing Guidelines](#testing-guidelines)
+- [Code Style](#code-style)
+- [Common Issues](#common-issues)
+
 ## Setup
 
 ```bash
