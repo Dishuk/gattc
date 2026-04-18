@@ -1,0 +1,63 @@
+schema_version: "1.0"
+
+service:
+  name: heart_rate_service
+  uuid: "0000180d-0000-1000-8000-00805f9b34fb"
+  description: "Bluetooth SIG Heart Rate service (0x180D)"
+
+characteristics:
+  hr_measurement:
+    uuid: "00002a37-0000-1000-8000-00805f9b34fb"
+    description: "Heart rate measurement with optional energy, RR-intervals, and v2 RR resolution hint"
+    properties: [notify]
+    permissions: [read]
+    payload:
+      flags:
+        type: uint8
+        bits:
+          0: hr_format_16bit
+          1: sensor_contact_detected
+          2: sensor_contact_supported
+          3: energy_expended_present
+          4: rr_interval_present
+          5: rr_resolution_1ms
+          6-7: reserved
+      heart_rate:
+        type: uint8
+        unit: bpm
+        values: [0, 255]
+        description: "Instantaneous heart rate"
+      energy_expended:
+        type: uint16
+        unit: kilojoules
+        description: "Cumulative energy since last reset (valid if flag bit 3 set)"
+      rr_intervals: uint16[]
+
+  body_sensor_location:
+    uuid: "00002a38-0000-1000-8000-00805f9b34fb"
+    description: "Where on the body the sensor is worn"
+    properties: [read]
+    permissions: [read]
+    payload:
+      location:
+        type: uint8
+        values:
+          0: other
+          1: chest
+          2: wrist
+          3: finger
+          4: hand
+          5: ear_lobe
+          6: foot
+          7: upper_arm
+
+  heart_rate_control_point:
+    uuid: "00002a39-0000-1000-8000-00805f9b34fb"
+    description: "Write commands to control the HR service"
+    properties: [write]
+    permissions: [write]
+    payload:
+      command:
+        type: uint8
+        values:
+          0x01: reset_energy_expended

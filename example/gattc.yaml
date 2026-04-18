@@ -1,0 +1,33 @@
+# gattc configuration
+
+# Schema locations - folders or individual .yaml files
+# Multiple entries supported
+schemas:
+  - "gattc/"
+#   - "services/custom_service.yaml"
+
+# Output paths
+output:
+  zephyr:
+    header: "src/generated/"          # Header files (.h) location
+    source: "src/generated/"          # Source files (.c) location
+    per_service: true                 # true = one .h/.c pair per service (default)
+                                      # false = all services in single gatt_services.h/.c
+
+  # Documentation output
+  docs:
+    path: "docs/ble/"
+    per_service: false                # true = one file per service
+                                      # false = all services in single gatt_services.<ext>
+    format: md                        # "md" (default) or "html"
+
+# Per-service output overrides (only applies when per_service: true)
+# Use service name (from service.name in schema) as key
+# services:
+#   echo_service:
+#     output:
+#       zephyr:
+#         header: "include/echo_service/"
+#         source: "src/echo_service/"
+#       # docs:
+#       #   path: "docs/echo_service/"

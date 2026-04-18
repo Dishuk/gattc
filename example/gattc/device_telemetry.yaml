@@ -1,0 +1,82 @@
+schema_version: "1.0"
+
+service:
+  name: device_telemetry
+  uuid: "e5a1b2c3-0000-4000-8000-abc000000001"
+  description: "Device health and identification — custom service"
+
+characteristics:
+  battery_status:
+    uuid: "e5a1b2c3-0000-4000-8000-abc000000002"
+    description: "Battery level and charging state"
+    properties: [read, notify]
+    permissions: [read]
+    payload:
+      level:
+        type: uint8
+        unit: percent
+        values: [0, 100]
+        description: "Remaining charge"
+      status:
+        type: uint8
+        bits:
+          0: charging
+          1: low_battery
+          2: critical
+          3: fault
+          4: thermal_throttle
+          5-7: reserved
+
+  firmware_info:
+    uuid: "e5a1b2c3-0000-4000-8000-abc000000003"
+    description: "Firmware and hardware identification"
+    properties: [read]
+    permissions: [read]
+    payload:
+      fw_major: uint8
+      fw_minor: uint8
+      fw_patch: uint8
+      hw_revision: uint8
+      serial_number: bytes[6]
+
+  uptime:
+    uuid: "e5a1b2c3-0000-4000-8000-abc000000004"
+    description: "Seconds since last boot"
+    properties: [read, notify]
+    permissions: [read]
+    payload:
+      seconds: uint32
+
+  thermometer:
+    uuid: "e5a1b2c3-0000-4000-8000-abc000000005"
+    description: "Internal board temperature (added in v2 hardware)"
+    properties: [read, notify]
+    permissions: [read]
+    payload:
+      temperature:
+        type: int16
+        unit: celsius_x100
+        values: [-4000, 12500]
+        description: "Board temperature, hundredths of a degree Celsius"
+
+  accelerometer:
+    uuid: "e5a1b2c3-0000-4000-8000-abc000000006"
+    description: "Packed 3-axis accelerometer samples for motion analysis"
+    properties: [notify]
+    permissions: [read]
+    payload:
+      sample_rate_hz:
+        type: uint16
+        unit: hertz
+        description: "Sampling rate of the enclosed batch"
+      first_sample_timestamp: uint32
+      samples[]:
+        x:
+          type: int16
+          unit: milli_g
+        y:
+          type: int16
+          unit: milli_g
+        z:
+          type: int16
+          unit: milli_g

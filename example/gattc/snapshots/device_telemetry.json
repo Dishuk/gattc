@@ -1,0 +1,388 @@
+{
+  "schema_version": "1.0",
+  "service": {
+    "name": "device_telemetry",
+    "uuid": "e5a1b2c3-0000-4000-8000-abc000000001",
+    "description": "Device health and identification \u2014 custom service"
+  },
+  "characteristics": [
+    {
+      "name": "battery_status",
+      "uuid": "e5a1b2c3-0000-4000-8000-abc000000002",
+      "properties": [
+        "read",
+        "notify"
+      ],
+      "permissions": [
+        "read"
+      ],
+      "description": "Battery level and charging state",
+      "payload": {
+        "fields": [
+          {
+            "name": "level",
+            "type_info": {
+              "base": "uint8",
+              "size": 1,
+              "endian": "none",
+              "is_array": false,
+              "array_size": null,
+              "is_repeated_struct": false
+            },
+            "offset": 0,
+            "description": "Remaining charge",
+            "unit": "percent",
+            "values": [
+              0,
+              100
+            ],
+            "bits": null,
+            "fields": null
+          },
+          {
+            "name": "status",
+            "type_info": {
+              "base": "uint8",
+              "size": 1,
+              "endian": "none",
+              "is_array": false,
+              "array_size": null,
+              "is_repeated_struct": false
+            },
+            "offset": 1,
+            "description": "",
+            "unit": null,
+            "values": null,
+            "bits": {
+              "0": "charging",
+              "1": "low_battery",
+              "2": "critical",
+              "3": "fault",
+              "4": "thermal_throttle",
+              "5-7": "reserved"
+            },
+            "fields": null
+          }
+        ],
+        "mode": null,
+        "min_size": null,
+        "max_size": null
+      },
+      "read_payload": null,
+      "write_payload": null,
+      "notify_payload": null
+    },
+    {
+      "name": "firmware_info",
+      "uuid": "e5a1b2c3-0000-4000-8000-abc000000003",
+      "properties": [
+        "read"
+      ],
+      "permissions": [
+        "read"
+      ],
+      "description": "Firmware and hardware identification",
+      "payload": {
+        "fields": [
+          {
+            "name": "fw_major",
+            "type_info": {
+              "base": "uint8",
+              "size": 1,
+              "endian": "none",
+              "is_array": false,
+              "array_size": null,
+              "is_repeated_struct": false
+            },
+            "offset": 0,
+            "description": "",
+            "unit": null,
+            "values": null,
+            "bits": null,
+            "fields": null
+          },
+          {
+            "name": "fw_minor",
+            "type_info": {
+              "base": "uint8",
+              "size": 1,
+              "endian": "none",
+              "is_array": false,
+              "array_size": null,
+              "is_repeated_struct": false
+            },
+            "offset": 1,
+            "description": "",
+            "unit": null,
+            "values": null,
+            "bits": null,
+            "fields": null
+          },
+          {
+            "name": "fw_patch",
+            "type_info": {
+              "base": "uint8",
+              "size": 1,
+              "endian": "none",
+              "is_array": false,
+              "array_size": null,
+              "is_repeated_struct": false
+            },
+            "offset": 2,
+            "description": "",
+            "unit": null,
+            "values": null,
+            "bits": null,
+            "fields": null
+          },
+          {
+            "name": "hw_revision",
+            "type_info": {
+              "base": "uint8",
+              "size": 1,
+              "endian": "none",
+              "is_array": false,
+              "array_size": null,
+              "is_repeated_struct": false
+            },
+            "offset": 3,
+            "description": "",
+            "unit": null,
+            "values": null,
+            "bits": null,
+            "fields": null
+          },
+          {
+            "name": "serial_number",
+            "type_info": {
+              "base": "bytes",
+              "size": 1,
+              "endian": "none",
+              "is_array": true,
+              "array_size": 6,
+              "is_repeated_struct": false
+            },
+            "offset": 4,
+            "description": "",
+            "unit": null,
+            "values": null,
+            "bits": null,
+            "fields": null
+          }
+        ],
+        "mode": null,
+        "min_size": null,
+        "max_size": null
+      },
+      "read_payload": null,
+      "write_payload": null,
+      "notify_payload": null
+    },
+    {
+      "name": "uptime",
+      "uuid": "e5a1b2c3-0000-4000-8000-abc000000004",
+      "properties": [
+        "read",
+        "notify"
+      ],
+      "permissions": [
+        "read"
+      ],
+      "description": "Seconds since last boot",
+      "payload": {
+        "fields": [
+          {
+            "name": "seconds",
+            "type_info": {
+              "base": "uint32",
+              "size": 4,
+              "endian": "little",
+              "is_array": false,
+              "array_size": null,
+              "is_repeated_struct": false
+            },
+            "offset": 0,
+            "description": "",
+            "unit": null,
+            "values": null,
+            "bits": null,
+            "fields": null
+          }
+        ],
+        "mode": null,
+        "min_size": null,
+        "max_size": null
+      },
+      "read_payload": null,
+      "write_payload": null,
+      "notify_payload": null
+    },
+    {
+      "name": "thermometer",
+      "uuid": "e5a1b2c3-0000-4000-8000-abc000000005",
+      "properties": [
+        "read",
+        "notify"
+      ],
+      "permissions": [
+        "read"
+      ],
+      "description": "Internal board temperature (added in v2 hardware)",
+      "payload": {
+        "fields": [
+          {
+            "name": "temperature",
+            "type_info": {
+              "base": "int16",
+              "size": 2,
+              "endian": "little",
+              "is_array": false,
+              "array_size": null,
+              "is_repeated_struct": false
+            },
+            "offset": 0,
+            "description": "Board temperature, hundredths of a degree Celsius",
+            "unit": "celsius_x100",
+            "values": [
+              -4000,
+              12500
+            ],
+            "bits": null,
+            "fields": null
+          }
+        ],
+        "mode": null,
+        "min_size": null,
+        "max_size": null
+      },
+      "read_payload": null,
+      "write_payload": null,
+      "notify_payload": null
+    },
+    {
+      "name": "accelerometer",
+      "uuid": "e5a1b2c3-0000-4000-8000-abc000000006",
+      "properties": [
+        "notify"
+      ],
+      "permissions": [
+        "read"
+      ],
+      "description": "Packed 3-axis accelerometer samples for motion analysis",
+      "payload": {
+        "fields": [
+          {
+            "name": "sample_rate_hz",
+            "type_info": {
+              "base": "uint16",
+              "size": 2,
+              "endian": "little",
+              "is_array": false,
+              "array_size": null,
+              "is_repeated_struct": false
+            },
+            "offset": 0,
+            "description": "Sampling rate of the enclosed batch",
+            "unit": "hertz",
+            "values": null,
+            "bits": null,
+            "fields": null
+          },
+          {
+            "name": "first_sample_timestamp",
+            "type_info": {
+              "base": "uint32",
+              "size": 4,
+              "endian": "little",
+              "is_array": false,
+              "array_size": null,
+              "is_repeated_struct": false
+            },
+            "offset": 2,
+            "description": "",
+            "unit": null,
+            "values": null,
+            "bits": null,
+            "fields": null
+          },
+          {
+            "name": "samples",
+            "type_info": {
+              "base": "struct",
+              "size": 6,
+              "endian": "none",
+              "is_array": true,
+              "array_size": null,
+              "is_repeated_struct": true
+            },
+            "offset": 6,
+            "description": "",
+            "unit": null,
+            "values": null,
+            "bits": null,
+            "fields": [
+              {
+                "name": "x",
+                "type_info": {
+                  "base": "int16",
+                  "size": 2,
+                  "endian": "little",
+                  "is_array": false,
+                  "array_size": null,
+                  "is_repeated_struct": false
+                },
+                "offset": 0,
+                "description": "",
+                "unit": "milli_g",
+                "values": null,
+                "bits": null,
+                "fields": null
+              },
+              {
+                "name": "y",
+                "type_info": {
+                  "base": "int16",
+                  "size": 2,
+                  "endian": "little",
+                  "is_array": false,
+                  "array_size": null,
+                  "is_repeated_struct": false
+                },
+                "offset": 2,
+                "description": "",
+                "unit": "milli_g",
+                "values": null,
+                "bits": null,
+                "fields": null
+              },
+              {
+                "name": "z",
+                "type_info": {
+                  "base": "int16",
+                  "size": 2,
+                  "endian": "little",
+                  "is_array": false,
+                  "array_size": null,
+                  "is_repeated_struct": false
+                },
+                "offset": 4,
+                "description": "",
+                "unit": "milli_g",
+                "values": null,
+                "bits": null,
+                "fields": null
+              }
+            ]
+          }
+        ],
+        "mode": null,
+        "min_size": null,
+        "max_size": null
+      },
+      "read_payload": null,
+      "write_payload": null,
+      "notify_payload": null
+    }
+  ],
+  "schema_revision": null
+}

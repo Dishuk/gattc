@@ -1,0 +1,225 @@
+{
+  "schema_version": "1.0",
+  "service": {
+    "name": "heart_rate_service",
+    "uuid": "0000180d-0000-1000-8000-00805f9b34fb",
+    "description": "Bluetooth SIG Heart Rate service (0x180D)"
+  },
+  "characteristics": [
+    {
+      "name": "hr_measurement",
+      "uuid": "00002a37-0000-1000-8000-00805f9b34fb",
+      "properties": [
+        "notify"
+      ],
+      "permissions": [
+        "read"
+      ],
+      "description": "Heart rate measurement with optional energy, RR-intervals, and v2 RR resolution hint",
+      "payload": {
+        "fields": [
+          {
+            "name": "flags",
+            "type_info": {
+              "base": "uint8",
+              "size": 1,
+              "endian": "none",
+              "is_array": false,
+              "array_size": null,
+              "is_repeated_struct": false
+            },
+            "offset": 0,
+            "description": "",
+            "unit": null,
+            "values": null,
+            "bits": {
+              "0": "hr_format_16bit",
+              "1": "sensor_contact_detected",
+              "2": "sensor_contact_supported",
+              "3": "energy_expended_present",
+              "4": "rr_interval_present",
+              "5": "rr_resolution_1ms",
+              "6-7": "reserved"
+            },
+            "fields": null
+          },
+          {
+            "name": "heart_rate",
+            "type_info": {
+              "base": "uint8",
+              "size": 1,
+              "endian": "none",
+              "is_array": false,
+              "array_size": null,
+              "is_repeated_struct": false
+            },
+            "offset": 1,
+            "description": "Instantaneous heart rate",
+            "unit": "bpm",
+            "values": [
+              0,
+              255
+            ],
+            "bits": null,
+            "fields": null
+          },
+          {
+            "name": "energy_expended",
+            "type_info": {
+              "base": "uint16",
+              "size": 2,
+              "endian": "little",
+              "is_array": false,
+              "array_size": null,
+              "is_repeated_struct": false
+            },
+            "offset": 2,
+            "description": "Cumulative energy since last reset (valid if flag bit 3 set)",
+            "unit": "kilojoules",
+            "values": null,
+            "bits": null,
+            "fields": null
+          },
+          {
+            "name": "rr_intervals",
+            "type_info": {
+              "base": "uint16",
+              "size": 2,
+              "endian": "little",
+              "is_array": true,
+              "array_size": null,
+              "is_repeated_struct": false
+            },
+            "offset": 4,
+            "description": "",
+            "unit": null,
+            "values": null,
+            "bits": null,
+            "fields": null
+          }
+        ],
+        "mode": null,
+        "min_size": null,
+        "max_size": null
+      },
+      "read_payload": null,
+      "write_payload": null,
+      "notify_payload": null
+    },
+    {
+      "name": "body_sensor_location",
+      "uuid": "00002a38-0000-1000-8000-00805f9b34fb",
+      "properties": [
+        "read"
+      ],
+      "permissions": [
+        "read"
+      ],
+      "description": "Where on the body the sensor is worn",
+      "payload": {
+        "fields": [
+          {
+            "name": "location",
+            "type_info": {
+              "base": "uint8",
+              "size": 1,
+              "endian": "none",
+              "is_array": false,
+              "array_size": null,
+              "is_repeated_struct": false
+            },
+            "offset": 0,
+            "description": "",
+            "unit": null,
+            "values": [
+              {
+                "value": "0",
+                "name": "other"
+              },
+              {
+                "value": "1",
+                "name": "chest"
+              },
+              {
+                "value": "2",
+                "name": "wrist"
+              },
+              {
+                "value": "3",
+                "name": "finger"
+              },
+              {
+                "value": "4",
+                "name": "hand"
+              },
+              {
+                "value": "5",
+                "name": "ear_lobe"
+              },
+              {
+                "value": "6",
+                "name": "foot"
+              },
+              {
+                "value": "7",
+                "name": "upper_arm"
+              }
+            ],
+            "bits": null,
+            "fields": null
+          }
+        ],
+        "mode": null,
+        "min_size": null,
+        "max_size": null
+      },
+      "read_payload": null,
+      "write_payload": null,
+      "notify_payload": null
+    },
+    {
+      "name": "heart_rate_control_point",
+      "uuid": "00002a39-0000-1000-8000-00805f9b34fb",
+      "properties": [
+        "write"
+      ],
+      "permissions": [
+        "write"
+      ],
+      "description": "Write commands to control the HR service",
+      "payload": {
+        "fields": [
+          {
+            "name": "command",
+            "type_info": {
+              "base": "uint8",
+              "size": 1,
+              "endian": "none",
+              "is_array": false,
+              "array_size": null,
+              "is_repeated_struct": false
+            },
+            "offset": 0,
+            "description": "",
+            "unit": null,
+            "values": [
+              {
+                "value": "1",
+                "name": "reset_energy_expended"
+              }
+            ],
+            "bits": null,
+            "fields": null
+          }
+        ],
+        "mode": null,
+        "min_size": null,
+        "max_size": null
+      },
+      "read_payload": null,
+      "write_payload": null,
+      "notify_payload": null
+    }
+  ],
+  "schema_revision": null
+}
