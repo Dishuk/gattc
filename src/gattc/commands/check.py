@@ -5,8 +5,9 @@ from typing import Optional
 
 import click
 
-from ..config import find_schemas, load_config
+from ..config import load_config
 from ..schema import load_and_validate_schema
+from ._schema_loading import resolve_schema_paths
 
 
 @click.command()
@@ -17,17 +18,7 @@ def check(schema: Optional[Path]):
     With gattc.yaml: validates all schemas from configured directories.
     Without: requires SCHEMA path argument.
     """
-    if schema:
-        schemas = [schema]
-    else:
-        config = load_config()
-        if not config:
-            raise click.ClickException(
-                "No schema specified and no gattc.yaml found."
-            )
-        schemas = find_schemas(config)
-        if not schemas:
-            raise click.ClickException("No .yaml files found in configured directories")
+    schemas, _ = resolve_schema_paths(schema, load_config())
 
     error_count = 0
     for schema_path in schemas:

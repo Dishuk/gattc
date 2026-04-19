@@ -419,6 +419,140 @@ def _validate_c_identifier(name: str) -> Optional[str]:
     return None
 
 
+def _validate_service(service: Service) -> List[str]:
+    """Validate service name and UUID."""
+    errors: List[str] = []
+    reason = _validate_c_identifier(service.name)
+    if reason:
+        errors.append(f"Service name '{service.name}' is not a valid C identifier: {reason}")
+
+    if not service.uuid:
+        errors.append("Service UUID is required")
+    elif not _is_valid_uuid(service.uuid):
+        errors.append(f"Invalid service UUID format: '{service.uuid}' (expected xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)")
+    return errors
+
+
+def _validate_characteristic_uniqueness(characteristics: List[Characteristic]) -> List[str]:
+    """Detect duplicate characteristic names and UUIDs."""
+    errors: List[str] = []
+
+    seen = set()
+    for char in characteristics:
+        if char.name in seen:
+            errors.append(f"Duplicate characteristic name: '{char.name}'")
+        seen.add(char.name)
+
+    seen_uuids = set()
+    for char in characteristics:
+        if char.uuid in seen_uuids:
+            errors.append(f"Duplicate characteristic UUID: '{char.uuid}' (in '{char.name}')")
+        seen_uuids.add(char.uuid)
+
+    return errors
+
+
+def _validate_characteristic(char: Characteristic) -> List[str]:
+    """Validate a characteristic's name, UUID, and property/permission consistency."""
+    errors: List[str] = []
+
+    reason = _validate_c_identifier(char.name)
+    if reason:
+        errors.append(f"Characteristic name '{char.name}' is not a valid C identifier: {reason}")
+
+    if not char.uuid:
+        errors.append(f"Characteristic '{char.name}' missing UUID")
+    elif not _is_valid_uuid(char.uuid):
+        errors.append(f"Invalid UUID format for '{char.name}': '{char.uuid}'")
+
+    read_perms = {"read", "read_encrypt", "read_authen"}
+    write_perms = {"write", "write_encrypt", "write_authen"}
+    has_read_perm = bool(read_perms & set(char.permissions))
+    has_write_perm = bool(write_perms & set(char.permissions))
+
+    if "read" in char.properties and not has_read_perm:
+        errors.append(f"Characteristic '{char.name}' has 'read' property but no read permission")
+    if "write" in char.properties and not has_write_perm:
+        errors.append(f"Characteristic '{char.name}' has 'write' property but no write permission")
+    if "write_without_response" in char.properties and not has_write_perm:
+        errors.append(f"Characteristic '{char.name}' has 'write_without_response' property but no write permission")
+
+    return errors
+
+
+def _validate_payload(char_name: str, payload: Payload) -> List[str]:
+    """Validate field name uniqueness, C identifiers, and nested field names."""
+    errors: List[str] = []
+
+    seen_fields = set()
+    for field in payload.fields:
+        if field.name in seen_fields:
+            errors.append(f"Duplicate field name '{field.name}' in '{char_name}'")
+        seen_fields.add(field.name)
+        reason = _validate_c_identifier(field.name)
+        if reason:
+            errors.append(f"Field name '{field.name}' in '{char_name}' is not a valid C identifier: {reason}")
+
+    for field in payload.fields:
+        if field.fields:
+            for nested in field.fields:
+                reason = _validate_c_identifier(nested.name)
+                if reason:
+                    errors.append(f"Field name '{nested.name}' in '{char_name}.{field.name}' is not a valid C identifier: {reason}")
+
+    return errors
+
+
+def _validate_bitfields(char_name: str, field: Field) -> List[str]:
+    """Validate bit names, ranges, and overlap for a field with bitfields."""
+    errors: List[str] = []
+    max_bit = field.type_info.size * 8 - 1
+
+    for bit_spec, bit_name in field.bits.items():
+        reason = _validate_c_identifier(bit_name)
+        if reason:
+            errors.append(f"Bit name '{bit_name}' in '{char_name}.{field.name}' is not a valid C identifier: {reason}")
+        bit_spec_str = str(bit_spec)
+        if "-" in bit_spec_str:
+            start, end = map(int, bit_spec_str.split("-"))
+            if start > max_bit or end > max_bit:
+                errors.append(
+                    f"Bitfield '{bit_spec}' in '{char_name}.{field.name}' "
+                    f"exceeds type size (max bit: {max_bit})"
+                )
+            if start > end:
+                errors.append(
+                    f"Bitfield '{bit_spec}' in '{char_name}.{field.name}' "
+                    f"has invalid range (start > end)"
+                )
+        else:
+            bit = int(bit_spec_str)
+            if bit > max_bit:
+                errors.append(
+                    f"Bit {bit} in '{char_name}.{field.name}' "
+                    f"exceeds type size (max bit: {max_bit})"
+                )
+
+    seen_bits: Dict[int, str] = {}
+    for bit_spec, bit_name in field.bits.items():
+        bit_spec_str = str(bit_spec)
+        if "-" in bit_spec_str:
+            start, end = map(int, bit_spec_str.split("-"))
+            indices = range(start, end + 1)
+        else:
+            indices = [int(bit_spec_str)]
+        for idx in indices:
+            if idx in seen_bits:
+                errors.append(
+                    f"Bitfield '{bit_spec}' in '{char_name}.{field.name}' "
+                    f"overlaps with '{seen_bits[idx]}' at bit {idx}"
+                )
+            else:
+                seen_bits[idx] = bit_spec_str
+
+    return errors
+
+
 def validate_schema(schema: Schema) -> List[str]:
     """Validate a GATT schema.
 
@@ -428,118 +562,19 @@ def validate_schema(schema: Schema) -> List[str]:
     Returns:
         List of validation error messages (empty if valid).
     """
-    errors = []
-
-    # Validate names are valid C identifiers
-    reason = _validate_c_identifier(schema.service.name)
-    if reason:
-        errors.append(f"Service name '{schema.service.name}' is not a valid C identifier: {reason}")
-
-    if not schema.service.uuid:
-        errors.append("Service UUID is required")
-    elif not _is_valid_uuid(schema.service.uuid):
-        errors.append(f"Invalid service UUID format: '{schema.service.uuid}' (expected xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)")
-
-    char_names = [char.name for char in schema.characteristics]
-    seen = set()
-    for name in char_names:
-        if name in seen:
-            errors.append(f"Duplicate characteristic name: '{name}'")
-        seen.add(name)
-
-    seen_uuids = set()
-    for char in schema.characteristics:
-        if char.uuid in seen_uuids:
-            errors.append(f"Duplicate characteristic UUID: '{char.uuid}' (in '{char.name}')")
-        seen_uuids.add(char.uuid)
+    errors: List[str] = []
+    errors.extend(_validate_service(schema.service))
+    errors.extend(_validate_characteristic_uniqueness(schema.characteristics))
 
     for char in schema.characteristics:
-        reason = _validate_c_identifier(char.name)
-        if reason:
-            errors.append(f"Characteristic name '{char.name}' is not a valid C identifier: {reason}")
-
-        if not char.uuid:
-            errors.append(f"Characteristic '{char.name}' missing UUID")
-        elif not _is_valid_uuid(char.uuid):
-            errors.append(f"Invalid UUID format for '{char.name}': '{char.uuid}'")
-
-        # Check property/permission consistency
-        read_perms = {"read", "read_encrypt", "read_authen"}
-        write_perms = {"write", "write_encrypt", "write_authen"}
-        has_read_perm = bool(read_perms & set(char.permissions))
-        has_write_perm = bool(write_perms & set(char.permissions))
-
-        if "read" in char.properties and not has_read_perm:
-            errors.append(f"Characteristic '{char.name}' has 'read' property but no read permission")
-        if "write" in char.properties and not has_write_perm:
-            errors.append(f"Characteristic '{char.name}' has 'write' property but no write permission")
-        if "write_without_response" in char.properties and not has_write_perm:
-            errors.append(f"Characteristic '{char.name}' has 'write_without_response' property but no write permission")
-
-        # Validate payload field names are unique and bitfields are in range
-        for payload in [getattr(char, pt) for pt in PAYLOAD_TYPES]:
-            if payload:
-                field_names = [f.name for f in payload.fields]
-                seen_fields = set()
-                for fname in field_names:
-                    if fname in seen_fields:
-                        errors.append(f"Duplicate field name '{fname}' in '{char.name}'")
-                    seen_fields.add(fname)
-                    reason = _validate_c_identifier(fname)
-                    if reason:
-                        errors.append(f"Field name '{fname}' in '{char.name}' is not a valid C identifier: {reason}")
-
-                for field in payload.fields:
-                    if field.fields:
-                        for nested in field.fields:
-                            reason = _validate_c_identifier(nested.name)
-                            if reason:
-                                errors.append(f"Field name '{nested.name}' in '{char.name}.{field.name}' is not a valid C identifier: {reason}")
-                    if field.bits:
-                        max_bit = field.type_info.size * 8 - 1
-                        for bit_spec, bit_name in field.bits.items():
-                            reason = _validate_c_identifier(bit_name)
-                            if reason:
-                                errors.append(f"Bit name '{bit_name}' in '{char.name}.{field.name}' is not a valid C identifier: {reason}")
-                            bit_spec_str = str(bit_spec)
-                            if "-" in bit_spec_str:
-                                # Range like "3-5"
-                                start, end = map(int, bit_spec_str.split("-"))
-                                if start > max_bit or end > max_bit:
-                                    errors.append(
-                                        f"Bitfield '{bit_spec}' in '{char.name}.{field.name}' "
-                                        f"exceeds type size (max bit: {max_bit})"
-                                    )
-                                if start > end:
-                                    errors.append(
-                                        f"Bitfield '{bit_spec}' in '{char.name}.{field.name}' "
-                                        f"has invalid range (start > end)"
-                                    )
-                            else:
-                                # Single bit like "9"
-                                bit = int(bit_spec_str)
-                                if bit > max_bit:
-                                    errors.append(
-                                        f"Bit {bit} in '{char.name}.{field.name}' "
-                                        f"exceeds type size (max bit: {max_bit})"
-                                    )
-                        # Check for overlapping bitfields
-                        seen_bits = {}
-                        for bit_spec, bit_name in field.bits.items():
-                            bit_spec_str = str(bit_spec)
-                            if "-" in bit_spec_str:
-                                start, end = map(int, bit_spec_str.split("-"))
-                                indices = range(start, end + 1)
-                            else:
-                                indices = [int(bit_spec_str)]
-                            for idx in indices:
-                                if idx in seen_bits:
-                                    errors.append(
-                                        f"Bitfield '{bit_spec}' in '{char.name}.{field.name}' "
-                                        f"overlaps with '{seen_bits[idx]}' at bit {idx}"
-                                    )
-                                else:
-                                    seen_bits[idx] = bit_spec_str
+        errors.extend(_validate_characteristic(char))
+        for payload in (getattr(char, pt) for pt in PAYLOAD_TYPES):
+            if payload is None:
+                continue
+            errors.extend(_validate_payload(char.name, payload))
+            for field in payload.fields:
+                if field.bits:
+                    errors.extend(_validate_bitfields(char.name, field))
 
     return errors
 

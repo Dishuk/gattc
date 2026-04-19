@@ -6,13 +6,14 @@ from typing import Optional
 import click
 from jinja2 import TemplateError
 
-from .._errors import _handle_error, _is_debug
-from ..config import find_schemas, load_config
+from .._errors import handle_error, is_debug
+from ..config import load_config
 from ..generators import docs as docs_gen
 from ..generators.docs import SUFFIX_TO_FORMAT
 from ..schema import load_and_validate_schema
 from ..changelog import load_changelog
-from .compile import _clear_files, _resolve_combined_mode
+from ._output_management import clear_files
+from ._schema_loading import resolve_combined_mode, resolve_schema_paths
 
 
 @click.command()
@@ -52,22 +53,15 @@ def docs(schema: Optional[Path], output: Optional[Path], combined: Optional[bool
     suffix = f".{fmt}"
 
     # Determine mode from flags or config
-    use_combined = _resolve_combined_mode(
+    use_combined = resolve_combined_mode(
         combined, per_service, config.output.docs.is_combined() if config else False
     )
 
-    if schema:
-        schema_paths = [schema]
-        output_path = output
-    else:
-        if not config:
-            raise click.ClickException(
-                "No schema specified and no gattc.yaml found."
-            )
-        schema_paths = find_schemas(config)
-        if not schema_paths:
-            raise click.ClickException("No .yaml files found in configured directories")
-        output_path = output or config.output.docs.path
+    schema_paths, _ = resolve_schema_paths(schema, config)
+    output_path = output
+    if not schema and not output_path:
+        # Project mode: config is non-None (guaranteed by resolve_schema_paths above)
+        output_path = config.output.docs.path
 
     # Load and validate all schemas
     loaded_schemas = []
@@ -91,7 +85,7 @@ def docs(schema: Optional[Path], output: Optional[Path], combined: Optional[bool
             docs_to_clear = [output_path / f"gatt_services{suffix}"]
         else:
             docs_to_clear = [output_path / f"{sp.stem}{suffix}" for sp, _ in loaded_schemas]
-        docs_cleared = _clear_files(docs_to_clear)
+        docs_cleared = clear_files(docs_to_clear)
         if docs_cleared:
             click.echo(f"Cleared {docs_cleared} {fmt.upper()} file(s) from output directory")
 
@@ -115,7 +109,7 @@ def docs(schema: Optional[Path], output: Optional[Path], combined: Optional[bool
         except (TemplateError, FileNotFoundError, ValueError) as e:
             raise click.ClickException(f"Error generating combined docs: {e}")
         except Exception as e:
-            _handle_error(e, "Error generating combined docs")
+            handle_error(e, "Error generating combined docs")
     else:
         # Generate separate documentation files
         if output_is_file and len(loaded_schemas) > 1:
@@ -138,7 +132,7 @@ def docs(schema: Optional[Path], output: Optional[Path], combined: Optional[bool
             except (TemplateError, FileNotFoundError, ValueError) as e:
                 click.echo(f"Error generating docs for {schema_path}: {e}", err=True)
             except Exception as e:
-                if _is_debug():
+                if is_debug():
                     raise
                 click.echo(f"Error generating docs for {schema_path}: {e}", err=True)
                 click.echo("  Use --debug for full traceback.", err=True)

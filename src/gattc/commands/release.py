@@ -6,7 +6,9 @@ from typing import Any, Dict, List, Optional
 
 import click
 
-from ..config import find_schemas, load_config
+from .._errors import handle_error
+from ..config import load_config
+from ..generators import docs as docs_gen
 from ..schema import Schema, load_and_validate_schema
 from ..snapshot import save_snapshot
 from ..diff import SchemaDiff
@@ -18,7 +20,7 @@ from ..changelog import (
     next_revision,
     write_entry,
 )
-from .compile import _load_diff, compile
+from ._schema_loading import load_diff, resolve_schema_paths
 
 
 _COMMENT_LINE_RE = re.compile(r"^\s*<!--.*?-->\s*$", re.MULTILINE)
@@ -68,39 +70,34 @@ def release(schema: Optional[Path], message: Optional[str], allow_empty: bool):
         gattc release                         # opens $EDITOR
         gattc release --allow-empty -m "Build 2.3.1 re-tag"
     """
-    from ..generators import docs as docs_gen
+    try:
+        _release_impl(schema, message, allow_empty)
+    except click.ClickException:
+        raise
+    except Exception as e:
+        handle_error(e, "Release failed")
 
+
+def _release_impl(schema: Optional[Path], message: Optional[str], allow_empty: bool) -> None:
+    """Implementation of the release command; wrapped by release() for error handling."""
     config = load_config()
+    schema_paths, root_dir = resolve_schema_paths(schema, config)
+    is_explicit = schema is not None
 
-    if schema:
-        s, errors = load_and_validate_schema(schema)
+    schema_inputs: List[tuple[Schema, str]] = []
+    for schema_path in schema_paths:
+        s, errors = load_and_validate_schema(schema_path)
         if errors:
-            raise click.ClickException(
-                f"Schema validation failed:\n" + "\n".join(f"  - {e}" for e in errors)
-            )
-        schema_inputs = [(s, schema.stem)]
-        root_dir = config.root_dir if config else Path.cwd()
-    else:
-        if not config:
-            raise click.ClickException(
-                "No schema specified and no gattc.yaml found.\n"
-                "Either provide a schema path or create gattc.yaml with 'gattc init'."
-            )
-        schema_paths = find_schemas(config)
-        if not schema_paths:
-            raise click.ClickException("No .yaml files found in configured directories")
+            if is_explicit:
+                raise click.ClickException(
+                    "Schema validation failed:\n" + "\n".join(f"  - {e}" for e in errors)
+                )
+            click.echo(f"Warning: Skipping {schema_path}: validation errors", err=True)
+            continue
+        schema_inputs.append((s, schema_path.stem))
 
-        root_dir = config.root_dir
-        schema_inputs = []
-        for schema_path in schema_paths:
-            s, errors = load_and_validate_schema(schema_path)
-            if errors:
-                click.echo(f"Warning: Skipping {schema_path}: validation errors", err=True)
-                continue
-            schema_inputs.append((s, schema_path.stem))
-
-        if not schema_inputs:
-            raise click.ClickException("No valid schemas found")
+    if not schema_inputs:
+        raise click.ClickException("No valid schemas found")
 
     released: List[tuple[Schema, str, Optional[SchemaDiff]]] = []
     for s, stem in schema_inputs:
@@ -137,7 +134,7 @@ def release(schema: Optional[Path], message: Optional[str], allow_empty: bool):
                 )
                 click.echo(f"Generated: {doc_path}")
 
-    if not schema:
+    if not is_explicit:
         click.echo(f"\nReleased {len(released)} service(s)")
 
 
@@ -151,7 +148,7 @@ def _release_one(
 ) -> tuple[bool, Optional[SchemaDiff]]:
     """Record a single service's release. Returns (recorded, diff)."""
     service_name = s.service.name
-    has_snapshot, diff = _load_diff(service_name, s, config, root_dir)
+    has_snapshot, diff = load_diff(service_name, s, config, root_dir)
     existing = load_changelog(service_name, config, root_dir)
 
     if not has_snapshot and existing:

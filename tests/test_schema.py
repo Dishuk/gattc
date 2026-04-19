@@ -362,3 +362,135 @@ class TestValidateSchemaIdentifiers:
         schema = _make_schema(service_name="bad-svc", char_name="1char", field_name="my field")
         errors = [e for e in validate_schema(schema) if "C identifier" in e]
         assert len(errors) >= 3
+
+
+def _make_char(name="char1", uuid="12345678-1234-1234-1234-123456789002",
+               properties=None, permissions=None, fields=None):
+    """Build a Characteristic with sensible defaults, letting tests override bits."""
+    if fields is None:
+        fields = [Field(name="value", type_info=parse_type("uint8"), offset=0)]
+    return Characteristic(
+        name=name,
+        uuid=uuid,
+        properties=["read"] if properties is None else properties,
+        permissions=["read"] if permissions is None else permissions,
+        payload=Payload(fields=fields),
+    )
+
+
+def _make_schema_with_chars(characteristics):
+    return Schema(
+        schema_version="1.0",
+        service=Service(name="test_svc", uuid="12345678-1234-1234-1234-123456789001"),
+        characteristics=characteristics,
+    )
+
+
+class TestValidateSchemaCharacteristics:
+    """Tests for characteristic-level rules in validate_schema."""
+
+    def test_duplicate_characteristic_uuid(self):
+        uuid = "12345678-1234-1234-1234-123456789002"
+        schema = _make_schema_with_chars([
+            _make_char(name="a", uuid=uuid),
+            _make_char(name="b", uuid=uuid),
+        ])
+        errors = validate_schema(schema)
+        assert any("Duplicate characteristic UUID" in e and "'b'" in e for e in errors)
+
+    def test_characteristic_missing_uuid(self):
+        schema = _make_schema_with_chars([_make_char(uuid="")])
+        errors = validate_schema(schema)
+        assert any("missing UUID" in e for e in errors)
+
+    def test_characteristic_invalid_uuid(self):
+        schema = _make_schema_with_chars([_make_char(uuid="not-a-uuid")])
+        errors = validate_schema(schema)
+        assert any("Invalid UUID format" in e for e in errors)
+
+    def test_read_property_without_read_permission(self):
+        schema = _make_schema_with_chars([
+            _make_char(properties=["read"], permissions=["write"]),
+        ])
+        errors = validate_schema(schema)
+        assert any("'read' property but no read permission" in e for e in errors)
+
+    def test_write_property_without_write_permission(self):
+        schema = _make_schema_with_chars([
+            _make_char(properties=["write"], permissions=["read"]),
+        ])
+        errors = validate_schema(schema)
+        assert any("'write' property but no write permission" in e for e in errors)
+
+    def test_write_without_response_without_write_permission(self):
+        schema = _make_schema_with_chars([
+            _make_char(properties=["write_without_response"], permissions=["read"]),
+        ])
+        errors = validate_schema(schema)
+        assert any(
+            "write_without_response" in e and "no write permission" in e
+            for e in errors
+        )
+
+    def test_encrypted_read_permission_satisfies_read_property(self):
+        schema = _make_schema_with_chars([
+            _make_char(properties=["read"], permissions=["read_encrypt"]),
+        ])
+        errors = validate_schema(schema)
+        assert not any("'read' property but no read permission" in e for e in errors)
+
+
+class TestValidateBitfieldBounds:
+    """Tests that bitfields respect the underlying type width."""
+
+    def _schema_with_bits(self, type_name, bits):
+        field = Field(
+            name="flags", type_info=parse_type(type_name), offset=0, bits=bits,
+        )
+        return _make_schema_with_chars([_make_char(fields=[field])])
+
+    def test_single_bit_exceeds_type_size(self):
+        schema = self._schema_with_bits("uint8", {"9": "bad"})
+        errors = validate_schema(schema)
+        assert any("exceeds type size" in e for e in errors)
+
+    def test_range_end_exceeds_type_size(self):
+        schema = self._schema_with_bits("uint8", {"6-10": "bad"})
+        errors = validate_schema(schema)
+        assert any("exceeds type size" in e for e in errors)
+
+    def test_range_start_greater_than_end(self):
+        schema = self._schema_with_bits("uint16", {"5-2": "bad"})
+        errors = validate_schema(schema)
+        assert any("invalid range" in e for e in errors)
+
+
+class TestValidatePayloadFields:
+    """Tests for field-level rules in validate_schema."""
+
+    def test_duplicate_field_names(self):
+        fields = [
+            Field(name="dup", type_info=parse_type("uint8"), offset=0),
+            Field(name="dup", type_info=parse_type("uint8"), offset=1),
+        ]
+        schema = _make_schema_with_chars([_make_char(fields=fields)])
+        errors = validate_schema(schema)
+        assert any("Duplicate field name 'dup'" in e for e in errors)
+
+    def test_nested_field_invalid_identifier(self):
+        nested = [Field(name="1bad", type_info=parse_type("uint8"), offset=0)]
+        parent = Field(
+            name="samples",
+            type_info=TypeInfo(
+                base="struct", size=1, endian="none",
+                is_array=True, is_repeated_struct=True,
+            ),
+            offset=0,
+            fields=nested,
+        )
+        schema = _make_schema_with_chars([_make_char(fields=[parent])])
+        errors = validate_schema(schema)
+        assert any(
+            "'1bad'" in e and "samples" in e and "C identifier" in e
+            for e in errors
+        )
