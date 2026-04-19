@@ -1,7 +1,6 @@
 """Compile command — compile GATT schemas to Zephyr C code."""
 
 from pathlib import Path
-from typing import Optional
 
 import click
 import yaml
@@ -33,15 +32,15 @@ from ._schema_loading import (
 @click.option("--docs/--no-docs", default=None, help="Generate documentation (Markdown or HTML)")
 @click.option("--no-diff", is_flag=True, default=False, help="Skip change detection against snapshots")
 def compile(
-    schema: Optional[Path],
-    output: Optional[Path],
-    header: Optional[Path],
-    source: Optional[Path],
-    combined: Optional[bool],
-    per_service: Optional[bool],
-    docs: Optional[bool],
+    schema: Path | None,
+    output: Path | None,
+    header: Path | None,
+    source: Path | None,
+    combined: bool | None,
+    per_service: bool | None,
+    docs: bool | None,
     no_diff: bool,
-):
+) -> None:
     """Compile GATT schema(s) to Zephyr C code.
 
     With gattc.yaml: compiles all schemas from configured directories.

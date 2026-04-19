@@ -17,7 +17,7 @@ from .commands.release import release
 @click.version_option(version=__version__, prog_name="gattc")
 @click.option("--debug", is_flag=True, default=False, help="Show full tracebacks on errors")
 @click.pass_context
-def main(ctx, debug):
+def main(ctx: click.Context, debug: bool) -> None:
     """gattc - BLE GATT schema compiler for Zephyr.
 
     Compiles YAML-based GATT service definitions into Zephyr C code.

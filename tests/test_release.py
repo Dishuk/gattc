@@ -1,15 +1,12 @@
 """Tests for gattc release command."""
 
-import pytest
-from pathlib import Path
 
+import pytest
 from click.testing import CliRunner
 
-from gattc.cli import main
-from gattc.snapshot import get_snapshot_path, load_snapshot, save_snapshot
 from gattc.changelog import get_changelog_dir, load_changelog
-from gattc.schema import Schema, Service, Characteristic, Payload, Field, TypeInfo
-
+from gattc.cli import main
+from gattc.snapshot import get_snapshot_path, load_snapshot
 
 MINIMAL_SCHEMA = """\
 schema_version: "1.0"

@@ -1,7 +1,6 @@
 """Changelog command — list and edit release entries."""
 
 from pathlib import Path
-from typing import List, Optional
 
 import click
 
@@ -10,11 +9,11 @@ from ..changelog import (
     get_revision_path,
     load_changelog,
 )
-from ..config import find_schemas, load_config
+from ..config import Config, find_schemas, load_config
 from ..schema import load_and_validate_schema
 
 
-def _discover_services(config) -> List[str]:
+def _discover_services(config: Config | None) -> list[str]:
     """Return service names from the project's schemas."""
     if not config:
         return []
@@ -24,11 +23,12 @@ def _discover_services(config) -> List[str]:
         if errors:
             click.echo(f"Warning: Skipping {path}: validation errors", err=True)
             continue
+        assert s is not None
         services.append(s.service.name)
     return services
 
 
-def _resolve_service(service: Optional[str], config) -> str:
+def _resolve_service(service: str | None, config: Config | None) -> str:
     """Pick a single service name; auto-selects the sole service if only one exists."""
     if service:
         return service
@@ -41,7 +41,7 @@ def _resolve_service(service: Optional[str], config) -> str:
     raise click.ClickException(f"Multiple services found ({names}); use --service to pick one.")
 
 
-def _resolve_services(service: Optional[str], config) -> List[str]:
+def _resolve_services(service: str | None, config: Config | None) -> list[str]:
     """Return all services to operate on: one if --service is set, otherwise every discovered service."""
     if service:
         return [service]
@@ -70,7 +70,7 @@ def _first_line(text: str) -> str:
     ),
 )
 @click.pass_context
-def changelog(ctx, service):
+def changelog(ctx: click.Context, service: str | None) -> None:
     """List and edit changelog entries.
 
     Each release is stored as one markdown file per revision at
@@ -94,7 +94,7 @@ def changelog(ctx, service):
 
 @changelog.command("list")
 @click.pass_context
-def list_cmd(ctx):
+def list_cmd(ctx: click.Context) -> None:
     """List changelog revisions. Shows every service unless --service is set."""
     config = load_config()
     root_dir = config.root_dir if config else Path.cwd()
@@ -108,7 +108,7 @@ def list_cmd(ctx):
 
         entries = load_changelog(service, config, root_dir)
         if not entries:
-            click.echo(f"  (no changelog entries)")
+            click.echo("  (no changelog entries)")
             continue
 
         changelog_dir = get_changelog_dir(service, config, root_dir)
@@ -136,7 +136,7 @@ def list_cmd(ctx):
 @changelog.command("path")
 @click.argument("revision", type=int, required=False)
 @click.pass_context
-def path_cmd(ctx, revision):
+def path_cmd(ctx: click.Context, revision: int | None) -> None:
     """Print the absolute path to a revision file.
 
     REVISION is the integer revision number. If omitted, the latest revision
@@ -153,7 +153,7 @@ def path_cmd(ctx, revision):
 @changelog.command("edit")
 @click.argument("revision", type=int, required=False)
 @click.pass_context
-def edit_cmd(ctx, revision):
+def edit_cmd(ctx: click.Context, revision: int | None) -> None:
     """Open a revision file in $EDITOR.
 
     REVISION is the integer revision number. If omitted, the latest revision
@@ -170,13 +170,13 @@ def edit_cmd(ctx, revision):
     click.echo(f"{service}: updated rev {rev}")
 
 
-def _resolve_revision(service: str, revision: Optional[int], config, root_dir: Path) -> int:
+def _resolve_revision(service: str, revision: int | None, config: Config | None, root_dir: Path) -> int:
     entries = load_changelog(service, config, root_dir)
     if not entries:
         raise click.ClickException(f"{service}: no changelog entries.")
 
     if revision is None:
-        return entries[-1]["revision"]
+        return int(entries[-1]["revision"])
 
     for entry in entries:
         if entry.get("revision") == revision:

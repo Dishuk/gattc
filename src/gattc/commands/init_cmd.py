@@ -6,7 +6,7 @@ import click
 
 
 @click.command("init")
-def init():
+def init() -> None:
     """Initialize gattc in current directory.
 
     Creates gattc.yaml, schema folder, and example schema.

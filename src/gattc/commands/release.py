@@ -2,16 +2,10 @@
 
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional
 
 import click
 
 from .._errors import handle_error
-from ..config import load_config
-from ..generators import docs as docs_gen
-from ..schema import Schema, load_and_validate_schema
-from ..snapshot import save_snapshot
-from ..diff import SchemaDiff
 from ..changelog import (
     build_frontmatter,
     get_changelog_dir,
@@ -20,8 +14,12 @@ from ..changelog import (
     next_revision,
     write_entry,
 )
+from ..config import Config, load_config
+from ..diff import SchemaDiff
+from ..generators import docs as docs_gen
+from ..schema import Schema, load_and_validate_schema
+from ..snapshot import save_snapshot
 from ._schema_loading import load_diff, resolve_schema_paths
-
 
 _COMMENT_LINE_RE = re.compile(r"^\s*<!--.*?-->\s*$", re.MULTILINE)
 
@@ -48,7 +46,7 @@ def _build_template_block(service_name: str, revision: int) -> str:
     help="Record a changelog entry even if the schema is unchanged (for "
          "infrastructure or build-process notes).",
 )
-def release(schema: Optional[Path], message: Optional[str], allow_empty: bool):
+def release(schema: Path | None, message: str | None, allow_empty: bool) -> None:
     """Record schema changes and regenerate documentation.
 
     Compares current schemas against stored snapshots, records changes
@@ -78,13 +76,13 @@ def release(schema: Optional[Path], message: Optional[str], allow_empty: bool):
         handle_error(e, "Release failed")
 
 
-def _release_impl(schema: Optional[Path], message: Optional[str], allow_empty: bool) -> None:
+def _release_impl(schema: Path | None, message: str | None, allow_empty: bool) -> None:
     """Implementation of the release command; wrapped by release() for error handling."""
     config = load_config()
     schema_paths, root_dir = resolve_schema_paths(schema, config)
     is_explicit = schema is not None
 
-    schema_inputs: List[tuple[Schema, str]] = []
+    schema_inputs: list[tuple[Schema, str]] = []
     for schema_path in schema_paths:
         s, errors = load_and_validate_schema(schema_path)
         if errors:
@@ -94,12 +92,13 @@ def _release_impl(schema: Optional[Path], message: Optional[str], allow_empty: b
                 )
             click.echo(f"Warning: Skipping {schema_path}: validation errors", err=True)
             continue
+        assert s is not None
         schema_inputs.append((s, schema_path.stem))
 
     if not schema_inputs:
         raise click.ClickException("No valid schemas found")
 
-    released: List[tuple[Schema, str, Optional[SchemaDiff]]] = []
+    released: list[tuple[Schema, str, SchemaDiff | None]] = []
     for s, stem in schema_inputs:
         recorded, diff = _release_one(s, message, config, root_dir, allow_empty=allow_empty)
         if recorded:
@@ -109,7 +108,7 @@ def _release_impl(schema: Optional[Path], message: Optional[str], allow_empty: b
     if docs_dir and released:
         fmt = config.output.docs.format if config else "md"
         schemas = [s for s, _, _ in released]
-        diffs = {s.service.name: d for s, _, d in released}
+        diffs = {s.service.name: d for s, _, d in released if d is not None}
         changelogs = {
             s.service.name: load_changelog(s.service.name, config, root_dir)
             for s, _, _ in released
@@ -140,12 +139,12 @@ def _release_impl(schema: Optional[Path], message: Optional[str], allow_empty: b
 
 def _release_one(
     s: Schema,
-    message: Optional[str],
-    config: Optional[Any],
+    message: str | None,
+    config: Config | None,
     root_dir: Path,
     *,
     allow_empty: bool = False,
-) -> tuple[bool, Optional[SchemaDiff]]:
+) -> tuple[bool, SchemaDiff | None]:
     """Record a single service's release. Returns (recorded, diff)."""
     service_name = s.service.name
     has_snapshot, diff = load_diff(service_name, s, config, root_dir)
@@ -175,13 +174,13 @@ def _release_one(
 
 def _commit_release(
     s: Schema,
-    message: Optional[str],
-    diff: Optional[SchemaDiff],
-    config: Optional[Any],
+    message: str | None,
+    diff: SchemaDiff | None,
+    config: Config | None,
     root_dir: Path,
     *,
     is_initial: bool,
-) -> tuple[bool, Optional[SchemaDiff]]:
+) -> tuple[bool, SchemaDiff | None]:
     """Collect body, write changelog, then save snapshot (rolling back the
     changelog file if the snapshot write fails).
 
@@ -227,7 +226,7 @@ def _collect_message_via_editor(
     service_name: str,
     revision: int,
     default_body: str = "",
-) -> Optional[str]:
+) -> str | None:
     """Open $EDITOR on a tempfile and return the cleaned body.
 
     Returns None if the editor aborted (non-zero exit) or the saved body is
@@ -245,7 +244,7 @@ def _collect_message_via_editor(
 
 
 def _cleanup_empty_changelog_dir(
-    service_name: str, config: Optional[Any], root_dir: Path
+    service_name: str, config: Config | None, root_dir: Path
 ) -> None:
     """Remove gattc/changelog/<service>/ if it exists and is empty."""
     changelog_dir = get_changelog_dir(service_name, config, root_dir)

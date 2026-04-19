@@ -1,7 +1,6 @@
 """Check command — validate GATT schema files."""
 
 from pathlib import Path
-from typing import Optional
 
 import click
 
@@ -12,7 +11,7 @@ from ._schema_loading import resolve_schema_paths
 
 @click.command()
 @click.argument("schema", type=click.Path(exists=True, path_type=Path), required=False)
-def check(schema: Optional[Path]):
+def check(schema: Path | None) -> None:
     """Validate GATT schema file(s).
 
     With gattc.yaml: validates all schemas from configured directories.

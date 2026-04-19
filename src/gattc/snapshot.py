@@ -5,15 +5,15 @@ Snapshot storage and loading for schema change tracking.
 import json
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
+from .config import Config
 from .schema import Schema
-
 
 DEFAULT_SNAPSHOT_PATH = "gattc/snapshots"
 
 
-def get_snapshot_dir(config: Optional[Any] = None, root_dir: Optional[Path] = None) -> Path:
+def get_snapshot_dir(config: Config | None = None, root_dir: Path | None = None) -> Path:
     """Get snapshot directory from config or default.
 
     Args:
@@ -27,20 +27,16 @@ def get_snapshot_dir(config: Optional[Any] = None, root_dir: Optional[Path] = No
     if root_dir is None:
         root_dir = Path.cwd()
 
-    # Check config for custom path
-    if config is not None:
-        snapshots_config = getattr(config, 'snapshots', None)
-        if snapshots_config is not None:
-            custom_path = getattr(snapshots_config, 'path', None)
-            if custom_path is not None:
-                if custom_path.is_absolute():
-                    return custom_path
-                return root_dir / custom_path
+    if config is not None and config.snapshots.path is not None:
+        custom_path = config.snapshots.path
+        if custom_path.is_absolute():
+            return custom_path
+        return root_dir / custom_path
 
     return root_dir / DEFAULT_SNAPSHOT_PATH
 
 
-def get_snapshot_path(service_name: str, config: Optional[Any] = None, root_dir: Optional[Path] = None) -> Path:
+def get_snapshot_path(service_name: str, config: Config | None = None, root_dir: Path | None = None) -> Path:
     """Get path to snapshot file for a service.
 
     Args:
@@ -54,7 +50,7 @@ def get_snapshot_path(service_name: str, config: Optional[Any] = None, root_dir:
     return get_snapshot_dir(config, root_dir) / f"{service_name}.json"
 
 
-def snapshot_exists(service_name: str, config: Optional[Any] = None, root_dir: Optional[Path] = None) -> bool:
+def snapshot_exists(service_name: str, config: Config | None = None, root_dir: Path | None = None) -> bool:
     """Check if snapshot exists for service.
 
     Args:
@@ -68,13 +64,13 @@ def snapshot_exists(service_name: str, config: Optional[Any] = None, root_dir: O
     return get_snapshot_path(service_name, config, root_dir).exists()
 
 
-def _schema_to_dict(schema: Schema) -> Dict[str, Any]:
+def _schema_to_dict(schema: Schema) -> dict[str, Any]:
     """Convert schema to a serializable dictionary.
 
     Converts dataclass instances recursively, handling nested structures
     and custom types like TypeInfo.
     """
-    def convert(obj: Any, key_name: str = None) -> Any:
+    def convert(obj: Any, key_name: str | None = None) -> Any:
         if hasattr(obj, '__dataclass_fields__'):
             return {k: convert(v, k) for k, v in asdict(obj).items()}
         elif isinstance(obj, list):
@@ -89,14 +85,15 @@ def _schema_to_dict(schema: Schema) -> Dict[str, Any]:
             return str(obj)
         return obj
 
-    return convert(schema)
+    result: dict[str, Any] = convert(schema)
+    return result
 
 
 def save_snapshot(
     service_name: str,
     schema: Schema,
-    config: Optional[Any] = None,
-    root_dir: Optional[Path] = None
+    config: Config | None = None,
+    root_dir: Path | None = None
 ) -> Path:
     """Save current schema as snapshot.
 
@@ -122,9 +119,9 @@ def save_snapshot(
 
 def load_snapshot(
     service_name: str,
-    config: Optional[Any] = None,
-    root_dir: Optional[Path] = None
-) -> Optional[Dict[str, Any]]:
+    config: Config | None = None,
+    root_dir: Path | None = None
+) -> dict[str, Any] | None:
     """Load existing snapshot, return None if not exists.
 
     Args:
@@ -140,5 +137,6 @@ def load_snapshot(
     if not snapshot_path.exists():
         return None
 
-    with open(snapshot_path, "r", encoding="utf-8") as f:
-        return json.load(f)
+    with open(snapshot_path, encoding="utf-8") as f:
+        data: dict[str, Any] = json.load(f)
+    return data

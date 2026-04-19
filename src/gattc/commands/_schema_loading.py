@@ -1,7 +1,6 @@
 """Schema discovery, loading, and diff helpers shared across commands."""
 
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
 
 import click
 import yaml
@@ -18,9 +17,9 @@ NO_SCHEMA_OR_CONFIG_MSG = (
 
 
 def resolve_schema_paths(
-    schema_arg: Optional[Path],
-    config: Optional[Config],
-) -> Tuple[List[Path], Path]:
+    schema_arg: Path | None,
+    config: Config | None,
+) -> tuple[list[Path], Path]:
     """Resolve schema paths from CLI argument or project config.
 
     Returns (schema_paths, root_dir). Raises ClickException on missing
@@ -37,7 +36,7 @@ def resolve_schema_paths(
     return schema_paths, config.root_dir
 
 
-def collect_service_names(schema_paths: List[Path]) -> Dict[str, Path]:
+def collect_service_names(schema_paths: list[Path]) -> dict[str, Path]:
     """Load schemas and collect service names."""
     service_names = {}
     for schema_path in schema_paths:
@@ -50,8 +49,8 @@ def collect_service_names(schema_paths: List[Path]) -> Dict[str, Path]:
 
 
 def resolve_combined_mode(
-    combined: Optional[bool],
-    per_service: Optional[bool],
+    combined: bool | None,
+    per_service: bool | None,
     config_is_combined: bool,
 ) -> bool:
     """Resolve whether to use combined output mode."""
@@ -65,7 +64,7 @@ def resolve_combined_mode(
     return config_is_combined
 
 
-def get_output_config_for_service(config: Optional[Config], service_name: str) -> OutputConfig:
+def get_output_config_for_service(config: Config | None, service_name: str) -> OutputConfig:
     """Get output configuration for a specific service."""
     if not config:
         return OutputConfig()
@@ -80,9 +79,9 @@ def get_output_config_for_service(config: Optional[Config], service_name: str) -
 def load_diff(
     service_name: str,
     schema: Schema,
-    config: Optional[Config],
+    config: Config | None,
     root_dir: Path,
-) -> Tuple[bool, Optional[SchemaDiff]]:
+) -> tuple[bool, SchemaDiff | None]:
     """Load snapshot and compute diff. Returns (snapshot_existed, diff_or_None)."""
     snapshot = load_snapshot(service_name, config, root_dir)
     if snapshot is None:
@@ -90,7 +89,7 @@ def load_diff(
     return True, diff_schemas(snapshot, schema)
 
 
-def load_schemas_with_errors(schema_paths: List[Path]) -> Tuple[List[Schema], int]:
+def load_schemas_with_errors(schema_paths: list[Path]) -> tuple[list[Schema], int]:
     """Load and validate multiple schemas, reporting errors."""
     loaded_schemas = []
     error_count = 0
@@ -103,6 +102,7 @@ def load_schemas_with_errors(schema_paths: List[Path]) -> Tuple[List[Schema], in
                 click.echo(f"  - {e}", err=True)
             error_count += 1
             continue
+        assert s is not None  # load_and_validate_schema: empty errors => schema present
         loaded_schemas.append(s)
 
     return loaded_schemas, error_count

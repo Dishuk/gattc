@@ -1,25 +1,30 @@
 """Tests for the Markdown/HTML documentation generator."""
 
 import re
-import pytest
-from pathlib import Path
 
-from gattc.schema import (
-    Field, TypeInfo, Payload, Characteristic, Service, Schema, load_schema,
-)
-from gattc.diff import SchemaDiff, CharacteristicChange, FieldChange
+import pytest
+
+from gattc.diff import CharacteristicChange, FieldChange, SchemaDiff
 from gattc.generators import docs
 from gattc.generators.docs import (
-    _title_case,
-    _format_type,
-    _format_bits,
-    _compute_field_length,
-    _format_values,
+    _build_docs_context,
     _build_field_data,
     _build_payload_data,
-    _build_docs_context,
+    _compute_field_length,
+    _format_bits,
+    _format_type,
+    _format_values,
+    _title_case,
 )
-
+from gattc.schema import (
+    Characteristic,
+    Field,
+    Payload,
+    Schema,
+    Service,
+    TypeInfo,
+    load_schema,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -905,7 +910,9 @@ class TestGenerateMarkdown:
         """Guards against drift: every tag emitted by diff_schemas must have a label
         in BOTH label maps, and the two maps must share the same keyset."""
         from gattc.diff import (
-            diff_schemas, SERVICE_CHANGE_LABELS, SERVICE_CHANGE_ROW_LABELS,
+            SERVICE_CHANGE_LABELS,
+            SERVICE_CHANGE_ROW_LABELS,
+            diff_schemas,
         )
         from gattc.snapshot import _schema_to_dict
 

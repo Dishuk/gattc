@@ -23,7 +23,7 @@
 ## Installation
 
 ```bash
-pip install git+https://github.com/polesskiy-dev/gattc.git
+pip install git+https://github.com/Dishuk/gattc.git
 ```
 
 ## Quick Start

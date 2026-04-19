@@ -1,15 +1,14 @@
 """Shared error-handling helpers for CLI commands."""
 
-from typing import Optional
 
 import click
 
 
-def is_debug(ctx: Optional[click.Context] = None) -> bool:
+def is_debug(ctx: click.Context | None = None) -> bool:
     """Check if --debug flag is active."""
     ctx = ctx or click.get_current_context(silent=True)
     if ctx and ctx.obj:
-        return ctx.obj.get("debug", False)
+        return bool(ctx.obj.get("debug", False))
     return False
 
 

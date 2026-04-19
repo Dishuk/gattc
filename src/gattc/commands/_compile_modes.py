@@ -1,7 +1,7 @@
 """Compilation orchestrators (single / combined / per-service) and their helpers."""
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import click
 import yaml
@@ -23,17 +23,17 @@ from ._schema_loading import (
 
 
 def collect_diffs_and_changelogs(
-    loaded_schemas: List[Schema],
-    config: Optional[Config],
+    loaded_schemas: list[Schema],
+    config: Config | None,
     root_dir: Path,
-) -> Tuple[Dict[str, SchemaDiff], Dict[str, List[Dict[str, Any]]], bool]:
+) -> tuple[dict[str, SchemaDiff], dict[str, list[dict[str, Any]]], bool]:
     """Load diffs and changelogs for all schemas.
 
     Returns:
         (diffs, changelogs, changes_detected)
     """
-    diffs: Dict[str, SchemaDiff] = {}
-    changelogs: Dict[str, List[Dict[str, Any]]] = {}
+    diffs: dict[str, SchemaDiff] = {}
+    changelogs: dict[str, list[dict[str, Any]]] = {}
     changes_detected = False
 
     for s in loaded_schemas:
@@ -53,10 +53,10 @@ def collect_diffs_and_changelogs(
 
 
 def generate_combined_docs(
-    loaded_schemas: List[Schema],
+    loaded_schemas: list[Schema],
     docs_dir: Path,
-    diffs: Optional[Dict[str, SchemaDiff]],
-    changelogs: Optional[Dict[str, List[Dict[str, Any]]]],
+    diffs: dict[str, SchemaDiff] | None,
+    changelogs: dict[str, list[dict[str, Any]]] | None,
     unreleased: bool,
     fmt: str = "md",
 ) -> Path:
@@ -73,14 +73,14 @@ def generate_combined_docs(
 
 def compile_schema(
     schema_path: Path,
-    output_dir: Optional[Path],
+    output_dir: Path | None,
     generate_docs: bool,
-    docs_dir: Optional[Path],
-    config: Optional[Config] = None,
-    header_dir: Optional[Path] = None,
-    source_dir: Optional[Path] = None,
+    docs_dir: Path | None,
+    config: Config | None = None,
+    header_dir: Path | None = None,
+    source_dir: Path | None = None,
     enable_diff: bool = True,
-) -> Tuple[List[Path], Optional[SchemaDiff], Schema]:
+) -> tuple[list[Path], SchemaDiff | None, Schema]:
     """Compile a single schema file. Returns (generated_files, diff, schema)."""
     generated = []
     diff = None
@@ -88,6 +88,7 @@ def compile_schema(
     s, errors = load_and_validate_schema(schema_path)
     if errors:
         raise ValueError("Schema validation failed:\n" + "\n".join(f"  - {e}" for e in errors))
+    assert s is not None
 
     service_name = s.service.name
     effective_output = get_output_config_for_service(config, service_name)
@@ -134,14 +135,15 @@ def compile_schema(
 
 def compile_single_schema_mode(
     schema: Path,
-    output: Optional[Path],
-    header: Optional[Path],
-    source: Optional[Path],
-    docs: Optional[bool],
-    config: Optional[Config],
+    output: Path | None,
+    header: Path | None,
+    source: Path | None,
+    docs: bool | None,
+    config: Config | None,
     enable_diff: bool = True,
 ) -> None:
     """Compile a single schema file (direct mode)."""
+    output_dir: Path | None
     if output and output.suffix in (".h", ".c"):
         output_dir = output.parent
     else:
@@ -182,13 +184,13 @@ def compile_single_schema_mode(
 
 
 def compile_combined_mode(
-    schemas: List[Path],
-    output_dir: Optional[Path],
-    header_dir: Optional[Path],
-    source_dir: Optional[Path],
-    docs_dir: Optional[Path],
+    schemas: list[Path],
+    output_dir: Path | None,
+    header_dir: Path | None,
+    source_dir: Path | None,
+    docs_dir: Path | None,
     generate_docs: bool,
-    config: Optional[Config] = None,
+    config: Config | None = None,
     enable_diff: bool = True,
 ) -> None:
     """Compile multiple schemas into combined output files."""
@@ -199,7 +201,9 @@ def compile_combined_mode(
 
     root_dir = config.root_dir if config else Path.cwd()
 
-    diffs, changelogs, changes_detected = {}, {}, False
+    diffs: dict[str, SchemaDiff] = {}
+    changelogs: dict[str, list[dict[str, Any]]] = {}
+    changes_detected = False
     if enable_diff:
         diffs, changelogs, changes_detected = collect_diffs_and_changelogs(
             loaded_schemas, config, root_dir
@@ -229,23 +233,23 @@ def compile_combined_mode(
 
 
 def compile_per_service_mode(
-    schemas: List[Path],
-    output_dir: Optional[Path],
-    header_dir: Optional[Path],
-    source_dir: Optional[Path],
-    docs_dir: Optional[Path],
+    schemas: list[Path],
+    output_dir: Path | None,
+    header_dir: Path | None,
+    source_dir: Path | None,
+    docs_dir: Path | None,
     generate_docs: bool,
     docs_combined: bool,
-    config: Optional[Config],
+    config: Config | None,
     enable_diff: bool = True,
 ) -> None:
     """Compile schemas into separate per-service output files."""
     success_count = 0
     changes_detected = False
 
-    loaded_schemas: List[Schema] = []
-    diffs: Dict[str, SchemaDiff] = {}
-    changelogs: Dict[str, List[Dict[str, Any]]] = {}
+    loaded_schemas: list[Schema] = []
+    diffs: dict[str, SchemaDiff] = {}
+    changelogs: dict[str, list[dict[str, Any]]] = {}
 
     per_service_docs = generate_docs and not docs_combined
 

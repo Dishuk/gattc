@@ -4,12 +4,11 @@ Configuration file loading for gattc.
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Union
+from typing import Any
 
 import yaml
 
 from ._util import warn_unknown_keys as _warn_unknown_keys
-
 
 CONFIG_FILENAME = "gattc.yaml"
 
@@ -17,15 +16,15 @@ CONFIG_FILENAME = "gattc.yaml"
 @dataclass
 class ZephyrOutputConfig:
     """Zephyr output configuration with header/source paths."""
-    header: Optional[Path] = None  # Header files path
-    source: Optional[Path] = None  # Source files path
+    header: Path | None = None  # Header files path
+    source: Path | None = None  # Source files path
     per_service: bool = True  # True = each service gets own .h/.c pair, False = all combined
 
-    def get_header_path(self) -> Optional[Path]:
+    def get_header_path(self) -> Path | None:
         """Get header output path."""
         return self.header
 
-    def get_source_path(self) -> Optional[Path]:
+    def get_source_path(self) -> Path | None:
         """Get source output path (falls back to header path)."""
         return self.source or self.header
 
@@ -37,7 +36,7 @@ class ZephyrOutputConfig:
 @dataclass
 class DocsOutputConfig:
     """Documentation output configuration."""
-    path: Optional[Path] = None
+    path: Path | None = None
     per_service: bool = True  # True = one file per service, False = all combined
     format: str = "md"  # "md" (default) or "html"
 
@@ -49,7 +48,7 @@ class DocsOutputConfig:
 @dataclass
 class SnapshotsConfig:
     """Snapshots configuration for change tracking."""
-    path: Optional[Path] = None  # Path to snapshots directory
+    path: Path | None = None  # Path to snapshots directory
 
 
 @dataclass
@@ -66,11 +65,11 @@ class ServiceConfig:
 
 @dataclass
 class Config:
-    schemas: List[Path] = field(default_factory=list)
+    schemas: list[Path] = field(default_factory=list)
     output: OutputConfig = field(default_factory=OutputConfig)
-    services: Dict[str, ServiceConfig] = field(default_factory=dict)
+    services: dict[str, ServiceConfig] = field(default_factory=dict)
     snapshots: SnapshotsConfig = field(default_factory=SnapshotsConfig)
-    config_path: Optional[Path] = None
+    config_path: Path | None = None
 
     @property
     def root_dir(self) -> Path:
@@ -83,7 +82,7 @@ class Config:
         return self.services.get(service_name, ServiceConfig())
 
 
-def find_config(start_dir: Optional[Path] = None) -> Optional[Path]:
+def find_config(start_dir: Path | None = None) -> Path | None:
     """Find gattc.yaml in start_dir or parent directories."""
     if start_dir is None:
         start_dir = Path.cwd()
@@ -103,7 +102,7 @@ def find_config(start_dir: Optional[Path] = None) -> Optional[Path]:
     return None
 
 
-def _parse_zephyr_output(zephyr_raw: dict, root_dir: Path) -> ZephyrOutputConfig:
+def _parse_zephyr_output(zephyr_raw: dict[str, Any], root_dir: Path) -> ZephyrOutputConfig:
     """Parse zephyr output configuration.
 
     Supports dict with:
@@ -134,7 +133,7 @@ def _parse_zephyr_output(zephyr_raw: dict, root_dir: Path) -> ZephyrOutputConfig
     return zephyr_config
 
 
-def _parse_docs_output(docs_raw: Union[str, dict], root_dir: Path) -> DocsOutputConfig:
+def _parse_docs_output(docs_raw: str | dict[str, Any], root_dir: Path) -> DocsOutputConfig:
     """Parse docs output configuration.
 
     Supports:
@@ -162,7 +161,7 @@ def _parse_docs_output(docs_raw: Union[str, dict], root_dir: Path) -> DocsOutput
     return docs_config
 
 
-def _parse_output_config(output_raw: dict, root_dir: Path) -> OutputConfig:
+def _parse_output_config(output_raw: dict[str, Any], root_dir: Path) -> OutputConfig:
     """Parse output configuration section."""
     if not isinstance(output_raw, dict):
         raise ValueError(f"'output' must be a dict, got {type(output_raw).__name__}")
@@ -178,7 +177,7 @@ def _parse_output_config(output_raw: dict, root_dir: Path) -> OutputConfig:
     return output_config
 
 
-def _parse_service_config(service_name: str, service_raw: dict, root_dir: Path) -> ServiceConfig:
+def _parse_service_config(service_name: str, service_raw: dict[str, Any], root_dir: Path) -> ServiceConfig:
     """Parse per-service configuration."""
     _warn_unknown_keys(service_raw, {"output"}, f"services.{service_name}")
     service_config = ServiceConfig()
@@ -189,7 +188,7 @@ def _parse_service_config(service_name: str, service_raw: dict, root_dir: Path) 
     return service_config
 
 
-def load_config(config_path: Optional[Path] = None) -> Optional[Config]:
+def load_config(config_path: Path | None = None) -> Config | None:
     """Load configuration from gattc.yaml.
 
     Args:
@@ -215,7 +214,7 @@ def load_config(config_path: Optional[Path] = None) -> Optional[Config]:
 
     root_dir = config_path.parent
 
-    with open(config_path, "r", encoding="utf-8") as f:
+    with open(config_path, encoding="utf-8") as f:
         data = yaml.safe_load(f)
 
     if not data:
@@ -273,7 +272,7 @@ def load_config(config_path: Optional[Path] = None) -> Optional[Config]:
     return config
 
 
-def find_schemas(config: Config) -> List[Path]:
+def find_schemas(config: Config) -> list[Path]:
     """Find all schema files based on config."""
     schemas = []
 
@@ -291,7 +290,7 @@ def find_schemas(config: Config) -> List[Path]:
     return sorted(schemas)
 
 
-def validate_service_configs(config: Config, found_services: Set[str]) -> List[str]:
+def validate_service_configs(config: Config, found_services: set[str]) -> list[str]:
     """Validate that all per-service configs reference existing services.
 
     Args:

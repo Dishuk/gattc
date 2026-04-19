@@ -21,7 +21,7 @@ A schema compiler for BLE GATT services. Generates firmware C code and documenta
 
 ```bash
 # Install
-pip install git+https://github.com/polesskiy-dev/gattc.git
+pip install git+https://github.com/Dishuk/gattc.git
 
 # Initialize new project (creates boilerplate echo_service.yaml)
 gattc init

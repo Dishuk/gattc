@@ -2,16 +2,15 @@
 Documentation generator for GATT schemas (HTML and Markdown).
 """
 
-from datetime import datetime
 from functools import lru_cache
 from itertools import count
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from jinja2 import Environment, PackageLoader
 
-from ..schema import Field, PAYLOAD_TYPES, Payload, Schema
-from ..diff import SchemaDiff, SERVICE_CHANGE_LABELS, SERVICE_CHANGE_ROW_LABELS
+from ..diff import SERVICE_CHANGE_LABELS, SERVICE_CHANGE_ROW_LABELS, SchemaDiff
+from ..schema import PAYLOAD_TYPES, Field, Payload, Schema
 
 
 def _title_case(name: str) -> str:
@@ -19,7 +18,7 @@ def _title_case(name: str) -> str:
     return " ".join(word[:1].upper() + word[1:] for word in name.split("_") if word)
 
 
-def _validate_changelog(changelog: Optional[List[Dict[str, Any]]]) -> None:
+def _validate_changelog(changelog: list[dict[str, Any]] | None) -> None:
     """Crash loudly on unknown service_change tags before the template silently
     renders them as empty strings."""
     for entry in changelog or []:
@@ -55,7 +54,7 @@ def _format_type(field: Field) -> str:
     return base
 
 
-def _format_bits(bits: Dict[str, str]) -> List[Dict[str, str]]:
+def _format_bits(bits: dict[str, str]) -> list[dict[str, str]]:
     """Format bitfield definitions for display."""
     result = []
     for bit_spec, bit_name in bits.items():
@@ -85,7 +84,7 @@ def _compute_field_length(field: Field) -> str:
     return str(type_info.size)
 
 
-def _format_values(values) -> Dict[str, Any]:
+def _format_values(values: Any) -> dict[str, Any]:
     """Format values field for display.
 
     Returns dict with:
@@ -123,7 +122,7 @@ def _format_values(values) -> Dict[str, Any]:
     return {"type": None, "display": "", "items": None}
 
 
-def _build_field_data(field: Field) -> Dict[str, Any]:
+def _build_field_data(field: Field) -> dict[str, Any]:
     """Build display data for a single field."""
     values_data = _format_values(field.values)
 
@@ -147,7 +146,7 @@ def _build_field_data(field: Field) -> Dict[str, Any]:
     return data
 
 
-def _build_payload_data(payload: Payload) -> Dict[str, Any]:
+def _build_payload_data(payload: Payload) -> dict[str, Any]:
     """Build display data for a payload."""
     fields = [_build_field_data(f) for f in payload.fields]
     size = payload.compute_size()
@@ -161,11 +160,11 @@ def _build_payload_data(payload: Payload) -> Dict[str, Any]:
 
 def _build_docs_context(
     schema: Schema,
-    diff: Optional[SchemaDiff] = None,
-    changelog: Optional[List[Dict[str, Any]]] = None,
+    diff: SchemaDiff | None = None,
+    changelog: list[dict[str, Any]] | None = None,
     svc_idx: int = 1,
     is_combined: bool = False,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Build context dictionary for documentation template.
 
     Args:
@@ -182,7 +181,7 @@ def _build_docs_context(
         char_status = diff.get_characteristic_status(char.name) if diff else None
 
         # Build payload data with field change status
-        def build_payload_with_diff(payload, payload_type: str):
+        def build_payload_with_diff(payload: Payload | None, payload_type: str) -> dict[str, Any] | None:
             if not payload:
                 return None
             data = _build_payload_data(payload)
@@ -223,7 +222,7 @@ def _build_docs_context(
     return ctx
 
 
-def _number_field(field: Dict[str, Any], prefix: str, z: "count[int]") -> None:
+def _number_field(field: dict[str, Any], prefix: str, z: "count[int]") -> None:
     """Stamp sub-table numbers on one field, recursing into nested struct fields."""
     if field.get("bits"):
         field["bits_table"] = f"{prefix}.{next(z)}"
@@ -235,7 +234,7 @@ def _number_field(field: Dict[str, Any], prefix: str, z: "count[int]") -> None:
             _number_field(nested, prefix, z)
 
 
-def _assign_table_numbers(svc_ctx: Dict[str, Any], svc_idx: int, is_combined: bool) -> None:
+def _assign_table_numbers(svc_ctx: dict[str, Any], svc_idx: int, is_combined: bool) -> None:
     """Number each sub-table (bitfield / named enum / nested struct) hierarchically.
 
     Stamps ``bits_table`` / ``values_table`` / ``struct_table`` on each field
@@ -266,7 +265,7 @@ def _get_jinja_env() -> Environment:
     return Environment(
         loader=PackageLoader("gattc", "templates/docs"),
         keep_trailing_newline=True,
-        autoescape=lambda name: name and name.endswith(".html.j2"),
+        autoescape=lambda name: bool(name and name.endswith(".html.j2")),
     )
 
 
@@ -277,7 +276,7 @@ _FORMATS = {
 SUFFIX_TO_FORMAT = {suffix: fmt for fmt, (_, suffix) in _FORMATS.items()}
 
 
-def _render_to_file(output_path: Path, context: Dict[str, Any], fmt: Optional[str] = None) -> Path:
+def _render_to_file(output_path: Path, context: dict[str, Any], fmt: str | None = None) -> Path:
     """Render the service template to a file (Markdown or HTML).
 
     If ``fmt`` is None, inferred from the output path suffix; falls back to "md".
@@ -306,10 +305,10 @@ def _render_to_file(output_path: Path, context: Dict[str, Any], fmt: Optional[st
 def generate(
     schema: Schema,
     output_path: Path,
-    diff: Optional[SchemaDiff] = None,
-    changelog: Optional[List[Dict[str, Any]]] = None,
+    diff: SchemaDiff | None = None,
+    changelog: list[dict[str, Any]] | None = None,
     unreleased: bool = False,
-    fmt: Optional[str] = None,
+    fmt: str | None = None,
 ) -> Path:
     """Generate documentation for a GATT service."""
     _validate_changelog(changelog)
@@ -324,12 +323,12 @@ def generate(
 
 
 def generate_combined(
-    schemas: List[Schema],
+    schemas: list[Schema],
     output_path: Path,
-    diffs: Optional[Dict[str, SchemaDiff]] = None,
-    changelogs: Optional[Dict[str, List[Dict[str, Any]]]] = None,
+    diffs: dict[str, SchemaDiff] | None = None,
+    changelogs: dict[str, list[dict[str, Any]]] | None = None,
     unreleased: bool = False,
-    fmt: Optional[str] = None,
+    fmt: str | None = None,
 ) -> Path:
     """Generate combined documentation for multiple GATT services."""
     services = []

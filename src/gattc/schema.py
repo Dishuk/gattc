@@ -5,12 +5,11 @@ Schema loading and validation for GATT service definitions.
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 import yaml
 
 from ._util import warn_unknown_keys as _warn_unknown_keys
-
 
 # Payload special keys (prefixed with _)
 PAYLOAD_MODE_KEY = "_mode"
@@ -54,7 +53,7 @@ class TypeInfo:
     size: int               # size in bytes
     endian: str             # "little", "big", or "none"
     is_array: bool          # True if array type
-    array_size: Optional[Union[int, str]] = None  # int for fixed, str for dynamic, None for MTU-fill
+    array_size: int | str | None = None  # int for fixed, str for dynamic, None for MTU-fill
     is_repeated_struct: bool = False  # True if this is a repeated struct (name[]:)
 
 
@@ -120,21 +119,21 @@ class Field:
     """Represents a field in a characteristic payload."""
     name: str
     type_info: TypeInfo
-    offset: Optional[int] = None  # None means auto-compute
+    offset: int | None = None  # None means auto-compute
     description: str = ""
-    unit: Optional[str] = None
-    values: Optional[Union[List[int], List[Dict[str, str]], str]] = None  # range, named values, or text
-    bits: Optional[Dict[str, str]] = None  # bitfield definitions
-    fields: Optional[List["Field"]] = None  # for repeated structs
+    unit: str | None = None
+    values: list[int] | list[dict[str, str]] | str | None = None  # range, named values, or text
+    bits: dict[str, str] | None = None  # bitfield definitions
+    fields: list["Field"] | None = None  # for repeated structs
 
 
 @dataclass
 class Payload:
     """Represents the payload structure of a characteristic."""
-    fields: List[Field] = field(default_factory=list)
-    mode: Optional[str] = None  # "variable", "mtu_packed", etc.
-    min_size: Optional[int] = None
-    max_size: Optional[int] = None
+    fields: list[Field] = field(default_factory=list)
+    mode: str | None = None  # "variable", "mtu_packed", etc.
+    min_size: int | None = None
+    max_size: int | None = None
 
     def compute_offsets(self) -> None:
         """Compute auto offsets for fields that don't have explicit offsets."""
@@ -155,13 +154,14 @@ class Payload:
             else:
                 current_offset += f.type_info.size
 
-    def compute_size(self) -> Optional[int]:
+    def compute_size(self) -> int | None:
         """Compute total payload size (None if variable/MTU-dependent)."""
         if self.mode in ("variable", "mtu_packed"):
             return None
 
         total = 0
         for f in self.fields:
+            assert f.offset is not None  # offsets computed by compute_offsets()
             if f.type_info.is_array:
                 if isinstance(f.type_info.array_size, int):
                     end = f.offset + f.type_info.size * f.type_info.array_size
@@ -180,13 +180,13 @@ class Characteristic:
     """Represents a GATT characteristic."""
     name: str
     uuid: str
-    properties: List[str] = field(default_factory=list)
-    permissions: List[str] = field(default_factory=list)
+    properties: list[str] = field(default_factory=list)
+    permissions: list[str] = field(default_factory=list)
     description: str = ""
-    payload: Optional[Payload] = None
-    read_payload: Optional[Payload] = None
-    write_payload: Optional[Payload] = None
-    notify_payload: Optional[Payload] = None
+    payload: Payload | None = None
+    read_payload: Payload | None = None
+    write_payload: Payload | None = None
+    notify_payload: Payload | None = None
 
 
 @dataclass
@@ -202,8 +202,8 @@ class Schema:
     """Represents a complete GATT schema."""
     schema_version: str
     service: Service
-    characteristics: List[Characteristic] = field(default_factory=list)
-    schema_revision: Optional[int] = None  # Optional user-controlled revision number
+    characteristics: list[Characteristic] = field(default_factory=list)
+    schema_revision: int | None = None  # Optional user-controlled revision number
 
 
 
@@ -298,7 +298,7 @@ def _parse_field(name: str, data: Any) -> Field:
     raise ValueError(f"Invalid field definition for '{field_name_clean}': {data}")
 
 
-def _parse_payload(data: Optional[Dict[str, Any]]) -> Optional[Payload]:
+def _parse_payload(data: dict[str, Any] | None) -> Payload | None:
     """Parse payload definition from YAML data."""
     if not data:
         return None
@@ -333,7 +333,7 @@ def _parse_payload(data: Optional[Dict[str, Any]]) -> Optional[Payload]:
     return payload
 
 
-def _parse_characteristic(name: str, data: Dict[str, Any]) -> Characteristic:
+def _parse_characteristic(name: str, data: dict[str, Any]) -> Characteristic:
     """Parse a characteristic from YAML data."""
     _warn_unknown_keys(data, _VALID_CHAR_KEYS, f"characteristic '{name}'")
     char = Characteristic(
@@ -356,7 +356,7 @@ def _parse_characteristic(name: str, data: Dict[str, Any]) -> Characteristic:
     return char
 
 
-def load_schema(path: Union[Path, str]) -> Schema:
+def load_schema(path: Path | str) -> Schema:
     """Load a GATT schema from a YAML file.
 
     Args:
@@ -371,7 +371,7 @@ def load_schema(path: Union[Path, str]) -> Schema:
     """
     path = Path(path)
 
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         data = yaml.safe_load(f)
 
     _warn_unknown_keys(data, _VALID_ROOT_KEYS, f"schema '{path.name}'")
@@ -407,7 +407,7 @@ def _is_valid_uuid(uuid: str) -> bool:
     return bool(re.match(pattern, uuid))
 
 
-def _validate_c_identifier(name: str) -> Optional[str]:
+def _validate_c_identifier(name: str) -> str | None:
     """Check if a name is a valid C identifier.
 
     Returns None if valid, or a reason string if invalid.
@@ -419,9 +419,9 @@ def _validate_c_identifier(name: str) -> Optional[str]:
     return None
 
 
-def _validate_service(service: Service) -> List[str]:
+def _validate_service(service: Service) -> list[str]:
     """Validate service name and UUID."""
-    errors: List[str] = []
+    errors: list[str] = []
     reason = _validate_c_identifier(service.name)
     if reason:
         errors.append(f"Service name '{service.name}' is not a valid C identifier: {reason}")
@@ -433,9 +433,9 @@ def _validate_service(service: Service) -> List[str]:
     return errors
 
 
-def _validate_characteristic_uniqueness(characteristics: List[Characteristic]) -> List[str]:
+def _validate_characteristic_uniqueness(characteristics: list[Characteristic]) -> list[str]:
     """Detect duplicate characteristic names and UUIDs."""
-    errors: List[str] = []
+    errors: list[str] = []
 
     seen = set()
     for char in characteristics:
@@ -452,9 +452,9 @@ def _validate_characteristic_uniqueness(characteristics: List[Characteristic]) -
     return errors
 
 
-def _validate_characteristic(char: Characteristic) -> List[str]:
+def _validate_characteristic(char: Characteristic) -> list[str]:
     """Validate a characteristic's name, UUID, and property/permission consistency."""
-    errors: List[str] = []
+    errors: list[str] = []
 
     reason = _validate_c_identifier(char.name)
     if reason:
@@ -480,34 +480,35 @@ def _validate_characteristic(char: Characteristic) -> List[str]:
     return errors
 
 
-def _validate_payload(char_name: str, payload: Payload) -> List[str]:
+def _validate_payload(char_name: str, payload: Payload) -> list[str]:
     """Validate field name uniqueness, C identifiers, and nested field names."""
-    errors: List[str] = []
+    errors: list[str] = []
 
     seen_fields = set()
-    for field in payload.fields:
-        if field.name in seen_fields:
-            errors.append(f"Duplicate field name '{field.name}' in '{char_name}'")
-        seen_fields.add(field.name)
-        reason = _validate_c_identifier(field.name)
+    for fld in payload.fields:
+        if fld.name in seen_fields:
+            errors.append(f"Duplicate field name '{fld.name}' in '{char_name}'")
+        seen_fields.add(fld.name)
+        reason = _validate_c_identifier(fld.name)
         if reason:
-            errors.append(f"Field name '{field.name}' in '{char_name}' is not a valid C identifier: {reason}")
+            errors.append(f"Field name '{fld.name}' in '{char_name}' is not a valid C identifier: {reason}")
 
-    for field in payload.fields:
-        if field.fields:
-            for nested in field.fields:
+    for fld in payload.fields:
+        if fld.fields:
+            for nested in fld.fields:
                 reason = _validate_c_identifier(nested.name)
                 if reason:
-                    errors.append(f"Field name '{nested.name}' in '{char_name}.{field.name}' is not a valid C identifier: {reason}")
+                    errors.append(f"Field name '{nested.name}' in '{char_name}.{fld.name}' is not a valid C identifier: {reason}")
 
     return errors
 
 
-def _validate_bitfields(char_name: str, field: Field) -> List[str]:
+def _validate_bitfields(char_name: str, field: Field) -> list[str]:
     """Validate bit names, ranges, and overlap for a field with bitfields."""
-    errors: List[str] = []
+    errors: list[str] = []
     max_bit = field.type_info.size * 8 - 1
 
+    assert field.bits is not None  # caller checks field.bits is non-empty
     for bit_spec, bit_name in field.bits.items():
         reason = _validate_c_identifier(bit_name)
         if reason:
@@ -533,12 +534,13 @@ def _validate_bitfields(char_name: str, field: Field) -> List[str]:
                     f"exceeds type size (max bit: {max_bit})"
                 )
 
-    seen_bits: Dict[int, str] = {}
+    seen_bits: dict[int, str] = {}
     for bit_spec, bit_name in field.bits.items():
         bit_spec_str = str(bit_spec)
+        indices: list[int]
         if "-" in bit_spec_str:
             start, end = map(int, bit_spec_str.split("-"))
-            indices = range(start, end + 1)
+            indices = list(range(start, end + 1))
         else:
             indices = [int(bit_spec_str)]
         for idx in indices:
@@ -553,7 +555,7 @@ def _validate_bitfields(char_name: str, field: Field) -> List[str]:
     return errors
 
 
-def validate_schema(schema: Schema) -> List[str]:
+def validate_schema(schema: Schema) -> list[str]:
     """Validate a GATT schema.
 
     Args:
@@ -562,7 +564,7 @@ def validate_schema(schema: Schema) -> List[str]:
     Returns:
         List of validation error messages (empty if valid).
     """
-    errors: List[str] = []
+    errors: list[str] = []
     errors.extend(_validate_service(schema.service))
     errors.extend(_validate_characteristic_uniqueness(schema.characteristics))
 
@@ -572,14 +574,14 @@ def validate_schema(schema: Schema) -> List[str]:
             if payload is None:
                 continue
             errors.extend(_validate_payload(char.name, payload))
-            for field in payload.fields:
-                if field.bits:
-                    errors.extend(_validate_bitfields(char.name, field))
+            for fld in payload.fields:
+                if fld.bits:
+                    errors.extend(_validate_bitfields(char.name, fld))
 
     return errors
 
 
-def load_and_validate_schema(schema_path: Path) -> Tuple[Optional[Schema], List[str]]:
+def load_and_validate_schema(schema_path: Path) -> tuple[Schema | None, list[str]]:
     """Load and validate a schema file.
 
     Combines load_schema and validate_schema into a single operation.

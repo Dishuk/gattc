@@ -1,11 +1,13 @@
 """Compile-validation smoke tests for generated C code."""
 
-import subprocess
 import shutil
-import pytest
+import subprocess
 from pathlib import Path
-from gattc.schema import load_schema
+
+import pytest
+
 from gattc.generators import zephyr
+from gattc.schema import load_schema
 
 STUBS_DIR = Path(__file__).parent / "stubs"
 GCC = shutil.which("gcc")

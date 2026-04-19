@@ -2,10 +2,8 @@
 
 import re
 
-import pytest
-from pathlib import Path
-from gattc.schema import load_schema
 from gattc.generators import zephyr
+from gattc.schema import load_schema
 
 
 class TestZephyrGenerator:
@@ -41,7 +39,6 @@ characteristics:
         assert source_path.exists()
 
         header = header_path.read_text()
-        source = source_path.read_text()
 
         # Check header contains expected elements
         assert "TEST_SERVICE_UUID_VAL" in header

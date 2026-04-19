@@ -4,12 +4,11 @@ Zephyr RTOS BT_GATT_SERVICE_DEFINE code generator.
 
 from functools import lru_cache
 from pathlib import Path
-from typing import List, Optional, Tuple, Union
+from typing import Any
 
 from jinja2 import Environment, PackageLoader
 
 from ..schema import Characteristic, Field, Payload, Schema, TypeInfo
-
 
 # Map schema properties to Zephyr BT_GATT_CHRC_* flags
 PROPERTY_MAP = {
@@ -65,13 +64,13 @@ def _format_uuid_128(uuid: str) -> str:
     )
 
 
-def _format_properties(props: List[str]) -> str:
+def _format_properties(props: list[str]) -> str:
     """Convert property list to Zephyr flags."""
     flags = [PROPERTY_MAP[p] for p in props if p in PROPERTY_MAP]
     return " | ".join(flags) if flags else "0"
 
 
-def _format_permissions(perms: List[str]) -> str:
+def _format_permissions(perms: list[str]) -> str:
     """Convert permission list to Zephyr flags."""
     flags = [PERMISSION_MAP[p] for p in perms if p in PERMISSION_MAP]
     return " | ".join(flags) if flags else "0"
@@ -106,7 +105,7 @@ def _char_attr_count(char: Characteristic) -> int:
     return _ATTRS_PER_CHAR + (_ATTRS_PER_CCC if _needs_ccc(char) else 0)
 
 
-def _format_ccc_permissions(perms: List[str]) -> str:
+def _format_ccc_permissions(perms: list[str]) -> str:
     """Derive CCC permissions from characteristic permissions.
 
     CCC always needs read and write. Security level is inherited from
@@ -141,7 +140,7 @@ def _get_c_type(type_info: TypeInfo) -> str:
     return C_TYPE_MAP.get(type_info.base, "uint8_t")
 
 
-def _get_endian_pack_func(type_info: TypeInfo) -> Optional[str]:
+def _get_endian_pack_func(type_info: TypeInfo) -> str | None:
     """Get Zephyr endianness conversion function for packing (CPU to wire)."""
     if type_info.endian == "none" or type_info.size == 1:
         return None
@@ -152,7 +151,7 @@ def _get_endian_pack_func(type_info: TypeInfo) -> Optional[str]:
         return f"sys_cpu_to_be{type_info.size * 8}"
 
 
-def _get_endian_unpack_func(type_info: TypeInfo) -> Optional[str]:
+def _get_endian_unpack_func(type_info: TypeInfo) -> str | None:
     """Get Zephyr endianness conversion function for unpacking (wire to CPU)."""
     if type_info.endian == "none" or type_info.size == 1:
         return None
@@ -170,7 +169,7 @@ def _is_fixed_array(field: Field) -> bool:
             not field.type_info.is_repeated_struct)
 
 
-def _generate_struct(name: str, fields: List[Field], indent: str = "") -> str:
+def _generate_struct(name: str, fields: list[Field], indent: str = "") -> str:
     """Generate a packed struct definition."""
     lines = []
     lines.append(f"{indent}typedef struct {{")
@@ -246,7 +245,7 @@ def _generate_nested_struct(parent_name: str, field: Field) -> str:
     return "\n".join(lines)
 
 
-def _generate_pack_function(name: str, fields: List[Field]) -> str:
+def _generate_pack_function(name: str, fields: list[Field]) -> str:
     """Generate a pack function for a payload."""
     params = []
     for field in fields:
@@ -283,6 +282,7 @@ def _generate_pack_function(name: str, fields: List[Field]) -> str:
             continue
 
         if _is_fixed_array(field):
+            assert isinstance(field.type_info.array_size, int)
             array_size = field.type_info.array_size
             if field.type_info.size == 1:
                 total_bytes = array_size * field.type_info.size
@@ -294,7 +294,7 @@ def _generate_pack_function(name: str, fields: List[Field]) -> str:
                     lines.append(f"        buf->{field.name}[i] = {endian_func}({field.name}[i]);")
                 else:
                     lines.append(f"        buf->{field.name}[i] = {field.name}[i];")
-                lines.append(f"    }}")
+                lines.append("    }")
         elif field.type_info.base == "bytes":
             lines.append(f"    memcpy(buf->{field.name}, {field.name}, {field.type_info.size});")
         else:
@@ -308,7 +308,7 @@ def _generate_pack_function(name: str, fields: List[Field]) -> str:
     return "\n".join(lines)
 
 
-def _generate_unpack_function(name: str, fields: List[Field]) -> str:
+def _generate_unpack_function(name: str, fields: list[Field]) -> str:
     """Generate an unpack function for a payload."""
     params = []
     for field in fields:
@@ -345,6 +345,7 @@ def _generate_unpack_function(name: str, fields: List[Field]) -> str:
             continue
 
         if _is_fixed_array(field):
+            assert isinstance(field.type_info.array_size, int)
             array_size = field.type_info.array_size
             if field.type_info.size == 1:
                 total_bytes = array_size * field.type_info.size
@@ -356,7 +357,7 @@ def _generate_unpack_function(name: str, fields: List[Field]) -> str:
                     lines.append(f"        {field.name}[i] = {endian_func}(buf->{field.name}[i]);")
                 else:
                     lines.append(f"        {field.name}[i] = buf->{field.name}[i];")
-                lines.append(f"    }}")
+                lines.append("    }")
         elif field.type_info.base == "bytes":
             lines.append(f"    memcpy({field.name}, buf->{field.name}, {field.type_info.size});")
         else:
@@ -385,8 +386,10 @@ def _generate_size_helpers(name: str, payload: Payload) -> str:
             has_flexible = True
             flexible_field = field
         elif field.type_info.is_array and isinstance(field.type_info.array_size, int):
+            assert field.offset is not None  # offsets are computed before codegen
             fixed_size = field.offset + field.type_info.size * field.type_info.array_size
         else:
+            assert field.offset is not None
             fixed_size = field.offset + field.type_info.size
 
     lines.append(f"#define {name.upper()}_HEADER_SIZE {fixed_size}")
@@ -471,7 +474,7 @@ def _generate_payload_types(service_name: str, char_name: str, payload: Payload,
     return "\n".join(parts)
 
 
-def _build_header_context(schema: Schema) -> dict:
+def _build_header_context(schema: Schema) -> dict[str, Any]:
     """Build context dictionary for header template."""
     service_name = schema.service.name
     service_upper = service_name.upper()
@@ -543,7 +546,7 @@ def _build_header_context(schema: Schema) -> dict:
     }
 
 
-def _build_source_context(schema: Schema, header_name: str) -> dict:
+def _build_source_context(schema: Schema, header_name: str) -> dict[str, Any]:
     """Build context dictionary for source template."""
     service_name = schema.service.name
     service_upper = service_name.upper()
@@ -590,10 +593,10 @@ def _get_jinja_env() -> Environment:
 
 
 def _resolve_output_path(
-    path: Optional[Union[Path, str]],
+    path: Path | str | None,
     schema_name: str,
     extension: str,
-    fallback_path: Optional[Union[Path, str]] = None,
+    fallback_path: Path | str | None = None,
 ) -> Path:
     """Resolve an output path for header or source file.
 
@@ -627,10 +630,10 @@ def _resolve_output_path(
 
 def generate(
     schema: Schema,
-    output_path: Optional[Union[Path, str]] = None,
-    header_path: Optional[Union[Path, str]] = None,
-    source_path: Optional[Union[Path, str]] = None,
-) -> Tuple[Path, Path]:
+    output_path: Path | str | None = None,
+    header_path: Path | str | None = None,
+    source_path: Path | str | None = None,
+) -> tuple[Path, Path]:
     """Generate Zephyr GATT service header and source files.
 
     Args:
@@ -682,12 +685,12 @@ def generate(
 
 
 def generate_combined(
-    schemas: List[Schema],
-    output_path: Optional[Union[Path, str]] = None,
-    header_path: Optional[Union[Path, str]] = None,
-    source_path: Optional[Union[Path, str]] = None,
+    schemas: list[Schema],
+    output_path: Path | str | None = None,
+    header_path: Path | str | None = None,
+    source_path: Path | str | None = None,
     output_name: str = "gatt_services",
-) -> Tuple[Path, Path]:
+) -> tuple[Path, Path]:
     """Generate combined Zephyr GATT service header and source files for multiple services.
 
     Args:

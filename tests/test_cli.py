@@ -7,7 +7,6 @@ from click.testing import CliRunner
 
 from gattc.cli import main
 
-
 MINIMAL_SCHEMA = """\
 schema_version: "1.0"
 service:

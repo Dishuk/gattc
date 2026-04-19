@@ -25,7 +25,7 @@ PYPROJECT = REPO_ROOT / "pyproject.toml"
 PART_CHOICES = ("major", "minor", "patch")
 
 
-def die(msg: str) -> "None":
+def die(msg: str) -> None:
     print(f"error: {msg}", file=sys.stderr)
     sys.exit(1)
 

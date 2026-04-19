@@ -1,21 +1,20 @@
 """Tests for gattc schema diffing functionality."""
 
-import pytest
 
 from gattc.diff import (
-    diff_schemas,
-    SchemaDiff,
     CharacteristicChange,
     FieldChange,
+    SchemaDiff,
     _compare_fields,
     _format_type_info,
+    diff_schemas,
 )
 from gattc.schema import (
+    Characteristic,
+    Field,
+    Payload,
     Schema,
     Service,
-    Characteristic,
-    Payload,
-    Field,
     TypeInfo,
 )
 from gattc.snapshot import _schema_to_dict

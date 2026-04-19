@@ -1,12 +1,23 @@
 """Tests for schema parsing."""
 
+
 import pytest
+
 from gattc.schema import (
-    parse_type, TypeInfo, Field, Payload, Characteristic, Service, Schema,
-    _parse_field, _parse_payload, load_schema, validate_schema,
-    _is_valid_uuid, _validate_c_identifier,
+    Characteristic,
+    Field,
+    Payload,
+    Schema,
+    Service,
+    TypeInfo,
+    _is_valid_uuid,
+    _parse_field,
+    _parse_payload,
+    _validate_c_identifier,
+    load_schema,
+    parse_type,
+    validate_schema,
 )
-from pathlib import Path
 
 
 class TestParseType:

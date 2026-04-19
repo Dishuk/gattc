@@ -1,17 +1,17 @@
 """Tests for gattc snapshot and changelog functionality."""
 
+from gattc.changelog import build_frontmatter, load_changelog, next_revision, write_entry
+from gattc.config import load_config
+from gattc.diff import diff_schemas
+from gattc.schema import Characteristic, Field, Payload, Schema, Service, TypeInfo
 from gattc.snapshot import (
+    DEFAULT_SNAPSHOT_PATH,
     get_snapshot_dir,
     get_snapshot_path,
     load_snapshot,
     save_snapshot,
     snapshot_exists,
-    DEFAULT_SNAPSHOT_PATH,
 )
-from gattc.changelog import build_frontmatter, load_changelog, next_revision, write_entry
-from gattc.diff import diff_schemas
-from gattc.schema import Schema, Service, Characteristic, Payload, Field, TypeInfo
-from gattc.config import load_config
 
 
 class TestGetSnapshotDir:

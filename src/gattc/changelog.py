@@ -15,29 +15,31 @@ Each file:
     Author-written release notes (markdown).
 """
 
+from collections.abc import Iterator
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Iterator, List, Optional, Tuple
+from typing import Any
 
 import click
 import yaml
 
+from .config import Config
 from .diff import SchemaDiff
 from .snapshot import get_snapshot_dir
 
 
-def get_changelog_dir(service_name: str, config: Optional[Any] = None, root_dir: Optional[Path] = None) -> Path:
+def get_changelog_dir(service_name: str, config: Config | None = None, root_dir: Path | None = None) -> Path:
     """Directory holding per-revision .md files for a service."""
     snapshots_dir = get_snapshot_dir(config, root_dir)
     return snapshots_dir.parent / "changelog" / service_name
 
 
-def get_revision_path(service_name: str, revision: int, config: Optional[Any] = None, root_dir: Optional[Path] = None) -> Path:
+def get_revision_path(service_name: str, revision: int, config: Config | None = None, root_dir: Path | None = None) -> Path:
     """File path for a specific revision's markdown file."""
     return get_changelog_dir(service_name, config, root_dir) / f"{revision:03d}.md"
 
 
-def _iter_revision_files(service_name: str, config: Optional[Any], root_dir: Optional[Path]) -> Iterator[Tuple[int, Path]]:
+def _iter_revision_files(service_name: str, config: Config | None, root_dir: Path | None) -> Iterator[tuple[int, Path]]:
     """Yield (revision, path) for every valid revision file in the service's changelog dir."""
     changelog_dir = get_changelog_dir(service_name, config, root_dir)
     if not changelog_dir.exists():
@@ -49,16 +51,16 @@ def _iter_revision_files(service_name: str, config: Optional[Any], root_dir: Opt
             continue
 
 
-def _parse_entry(path: Path) -> Dict[str, Any]:
+def _parse_entry(path: Path) -> dict[str, Any]:
     """Parse a changelog .md file into a dict entry."""
     text = path.read_text(encoding="utf-8")
     frontmatter, body = split_frontmatter(text)
-    entry: Dict[str, Any] = yaml.safe_load(frontmatter) or {}
+    entry: dict[str, Any] = yaml.safe_load(frontmatter) or {}
     entry["message"] = body.strip()
     return entry
 
 
-def split_frontmatter(text: str) -> Tuple[str, str]:
+def split_frontmatter(text: str) -> tuple[str, str]:
     """Split a markdown file into (frontmatter_yaml, body).
 
     Raises ValueError if fences are missing or malformed.
@@ -74,9 +76,9 @@ def split_frontmatter(text: str) -> Tuple[str, str]:
     raise ValueError("missing closing '---' frontmatter fence")
 
 
-def load_changelog(service_name: str, config: Optional[Any] = None, root_dir: Optional[Path] = None) -> List[Dict[str, Any]]:
+def load_changelog(service_name: str, config: Config | None = None, root_dir: Path | None = None) -> list[dict[str, Any]]:
     """Load all changelog entries for a service, sorted oldest-first."""
-    entries: List[Tuple[int, Dict[str, Any]]] = []
+    entries: list[tuple[int, dict[str, Any]]] = []
     for rev, path in _iter_revision_files(service_name, config, root_dir):
         try:
             entry = _parse_entry(path)
@@ -89,19 +91,19 @@ def load_changelog(service_name: str, config: Optional[Any] = None, root_dir: Op
     return [e for _, e in entries]
 
 
-def next_revision(service_name: str, config: Optional[Any] = None, root_dir: Optional[Path] = None) -> int:
+def next_revision(service_name: str, config: Config | None = None, root_dir: Path | None = None) -> int:
     """Compute the next revision number based on existing files."""
     revisions = [rev for rev, _ in _iter_revision_files(service_name, config, root_dir)]
     return (max(revisions) + 1) if revisions else 1
 
 
-def build_frontmatter(diff: Optional[SchemaDiff], revision: int) -> Dict[str, Any]:
+def build_frontmatter(diff: SchemaDiff | None, revision: int) -> dict[str, Any]:
     """Build the frontmatter dict from a SchemaDiff.
 
     Pass diff=None for metadata-only entries (initial release or --allow-empty
     on an unchanged schema).
     """
-    fm: Dict[str, Any] = {
+    fm: dict[str, Any] = {
         "revision": revision,
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
     }
@@ -118,7 +120,7 @@ def build_frontmatter(diff: Optional[SchemaDiff], revision: int) -> Dict[str, An
             "new": diff.new_schema_revision,
         }
 
-    characteristics: Dict[str, Any] = {"added": [], "removed": [], "modified": {}}
+    characteristics: dict[str, Any] = {"added": [], "removed": [], "modified": {}}
 
     for char_change in diff.characteristic_changes:
         if char_change.change_type == "added":
@@ -126,7 +128,7 @@ def build_frontmatter(diff: Optional[SchemaDiff], revision: int) -> Dict[str, An
         elif char_change.change_type == "removed":
             characteristics["removed"].append(char_change.name)
         elif char_change.change_type == "modified":
-            mods: Dict[str, Any] = {}
+            mods: dict[str, Any] = {}
 
             if char_change.uuid_change:
                 mods["uuid"] = {
@@ -151,14 +153,14 @@ def build_frontmatter(diff: Optional[SchemaDiff], revision: int) -> Dict[str, An
             fields_added, fields_removed, fields_modified = [], [], []
             for fc in char_change.field_changes:
                 if fc.change_type == "added":
-                    info: Dict[str, Any] = {"name": fc.name}
+                    info: dict[str, Any] = {"name": fc.name}
                     if fc.new_value:
                         info["type"] = fc.new_value
                     fields_added.append(info)
                 elif fc.change_type == "removed":
                     fields_removed.append(fc.name)
                 elif fc.change_type == "modified":
-                    mod: Dict[str, Any] = {"name": fc.name}
+                    mod: dict[str, Any] = {"name": fc.name}
                     if fc.details:
                         mod["detail"] = fc.details
                     fields_modified.append(mod)
@@ -180,7 +182,7 @@ def build_frontmatter(diff: Optional[SchemaDiff], revision: int) -> Dict[str, An
     return fm
 
 
-def dump_frontmatter(fm: Dict[str, Any]) -> str:
+def dump_frontmatter(fm: dict[str, Any]) -> str:
     """Render a frontmatter dict as a YAML fenced block."""
     body = yaml.safe_dump(fm, sort_keys=False, default_flow_style=False, allow_unicode=True)
     return f"---\n{body}---\n"
@@ -189,10 +191,10 @@ def dump_frontmatter(fm: Dict[str, Any]) -> str:
 def write_entry(
     service_name: str,
     revision: int,
-    frontmatter: Dict[str, Any],
+    frontmatter: dict[str, Any],
     body: str,
-    config: Optional[Any] = None,
-    root_dir: Optional[Path] = None,
+    config: Config | None = None,
+    root_dir: Path | None = None,
 ) -> Path:
     """Write a changelog revision file (frontmatter + body)."""
     path = get_revision_path(service_name, revision, config, root_dir)

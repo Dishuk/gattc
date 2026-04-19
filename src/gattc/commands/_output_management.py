@@ -1,12 +1,11 @@
 """Output file management helpers shared across commands."""
 
 from pathlib import Path
-from typing import List, Optional
 
 import click
 
 
-def clear_files(files: List[Path]) -> int:
+def clear_files(files: list[Path]) -> int:
     """Delete specific files. Returns the number of files deleted."""
     deleted = 0
     for file_path in files:
@@ -17,15 +16,15 @@ def clear_files(files: List[Path]) -> int:
 
 
 def collect_output_files(
-    names: List[str],
-    header_dir: Optional[Path],
-    source_dir: Optional[Path],
-    docs_dir: Optional[Path],
+    names: list[str],
+    header_dir: Path | None,
+    source_dir: Path | None,
+    docs_dir: Path | None,
     generate_docs: bool,
     docs_fmt: str = "md",
-) -> List[Path]:
+) -> list[Path]:
     """Build the list of files that will be generated, so only those get cleared."""
-    files: List[Path] = []
+    files: list[Path] = []
     for name in names:
         if header_dir:
             files.append(header_dir / f"{name}.h")
@@ -39,10 +38,10 @@ def collect_output_files(
 
 
 def clear_output_files(
-    names: List[str],
-    header_dir: Optional[Path],
-    source_dir: Optional[Path],
-    docs_dir: Optional[Path],
+    names: list[str],
+    header_dir: Path | None,
+    source_dir: Path | None,
+    docs_dir: Path | None,
     generate_docs: bool,
     docs_fmt: str = "md",
 ) -> None:

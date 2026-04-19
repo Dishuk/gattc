@@ -1,9 +1,8 @@
 """Tests for gattc configuration loading."""
 
-import pytest
 from pathlib import Path
 
-from gattc.config import load_config, find_config, find_schemas, Config, OutputConfig
+from gattc.config import Config, find_config, find_schemas, load_config
 
 
 class TestLoadConfig:

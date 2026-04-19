@@ -1,17 +1,16 @@
 """Docs command — generate Markdown or HTML documentation from GATT schemas."""
 
 from pathlib import Path
-from typing import Optional
 
 import click
 from jinja2 import TemplateError
 
 from .._errors import handle_error, is_debug
+from ..changelog import load_changelog
 from ..config import load_config
 from ..generators import docs as docs_gen
 from ..generators.docs import SUFFIX_TO_FORMAT
-from ..schema import load_and_validate_schema
-from ..changelog import load_changelog
+from ..schema import Schema, load_and_validate_schema
 from ._output_management import clear_files
 from ._schema_loading import resolve_combined_mode, resolve_schema_paths
 
@@ -23,7 +22,7 @@ from ._schema_loading import resolve_combined_mode, resolve_schema_paths
 @click.option("--per-service", "per_service", is_flag=True, default=None, help="Generate a separate file per service")
 @click.option("-f", "--format", "fmt", type=click.Choice(["md", "html"]), default=None,
               help="Output format; otherwise inferred from -o suffix, gattc.yaml, or 'md'")
-def docs(schema: Optional[Path], output: Optional[Path], combined: Optional[bool], per_service: Optional[bool], fmt: Optional[str]):
+def docs(schema: Path | None, output: Path | None, combined: bool | None, per_service: bool | None, fmt: str | None) -> None:
     """Generate documentation from GATT schema(s) as Markdown (default) or HTML.
 
     With gattc.yaml: generates docs for all schemas.
@@ -60,11 +59,11 @@ def docs(schema: Optional[Path], output: Optional[Path], combined: Optional[bool
     schema_paths, _ = resolve_schema_paths(schema, config)
     output_path = output
     if not schema and not output_path:
-        # Project mode: config is non-None (guaranteed by resolve_schema_paths above)
+        # Project mode: resolve_schema_paths guarantees config is non-None here
+        assert config is not None
         output_path = config.output.docs.path
 
-    # Load and validate all schemas
-    loaded_schemas = []
+    loaded_schemas: list[tuple[Path, Schema]] = []
     for schema_path in schema_paths:
         s, errors = load_and_validate_schema(schema_path)
         if errors:
@@ -72,6 +71,7 @@ def docs(schema: Optional[Path], output: Optional[Path], combined: Optional[bool
             for e in errors:
                 click.echo(f"  - {e}", err=True)
             continue
+        assert s is not None
         loaded_schemas.append((schema_path, s))
 
     if not loaded_schemas:
@@ -95,6 +95,7 @@ def docs(schema: Optional[Path], output: Optional[Path], combined: Optional[bool
     if use_combined:
         # Generate combined documentation
         if output_is_file:
+            assert output_path is not None  # output_is_file implies output_path is set
             out_path = output_path
         elif output_path:
             out_path = output_path / f"gatt_services{suffix}"
@@ -120,6 +121,7 @@ def docs(schema: Optional[Path], output: Optional[Path], combined: Optional[bool
         for schema_path, s in loaded_schemas:
             try:
                 if output_is_file:
+                    assert output_path is not None
                     out_path = output_path
                 elif output_path:
                     out_path = output_path / f"{schema_path.stem}{suffix}"

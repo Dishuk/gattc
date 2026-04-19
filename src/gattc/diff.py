@@ -3,7 +3,7 @@ Schema diffing and change detection for changelog generation.
 """
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Literal, Optional, Set
+from typing import Any, Literal
 
 from .schema import PAYLOAD_TYPES, Schema
 from .snapshot import _schema_to_dict
@@ -15,14 +15,14 @@ from .snapshot import _schema_to_dict
 ServiceChangeTag = Literal["name", "uuid", "description"]
 
 # Long form, used by the CLI changelog output and the HTML changelog cell.
-SERVICE_CHANGE_LABELS: Dict[str, str] = {
+SERVICE_CHANGE_LABELS: dict[str, str] = {
     "name": "Service name changed",
     "uuid": "Service UUID changed",
     "description": "Service description changed",
 }
 
 # Short form, used as row labels in the Markdown "Modified service" table.
-SERVICE_CHANGE_ROW_LABELS: Dict[str, str] = {
+SERVICE_CHANGE_ROW_LABELS: dict[str, str] = {
     "name": "Name changed",
     "uuid": "UUID changed",
     "description": "Description updated",
@@ -44,12 +44,12 @@ class CharacteristicChange:
     """Represents changes to a characteristic."""
     name: str
     change_type: Literal['added', 'removed', 'modified']
-    field_changes: List[FieldChange] = field(default_factory=list)
-    uuid_change: Optional[tuple] = None  # (old_uuid, new_uuid)
-    properties_added: List[str] = field(default_factory=list)
-    properties_removed: List[str] = field(default_factory=list)
-    permissions_added: List[str] = field(default_factory=list)
-    permissions_removed: List[str] = field(default_factory=list)
+    field_changes: list[FieldChange] = field(default_factory=list)
+    uuid_change: tuple[str, str] | None = None  # (old_uuid, new_uuid)
+    properties_added: list[str] = field(default_factory=list)
+    properties_removed: list[str] = field(default_factory=list)
+    permissions_added: list[str] = field(default_factory=list)
+    permissions_removed: list[str] = field(default_factory=list)
     offsets_changed: bool = False
     description_changed: bool = False
     payload_config_changed: bool = False
@@ -71,14 +71,14 @@ class SchemaDiff:
     """Represents the complete diff between two schema versions."""
     service_name: str
     has_changes: bool
-    characteristic_changes: List[CharacteristicChange] = field(default_factory=list)
-    service_changes: List[ServiceChangeTag] = field(default_factory=list)
+    characteristic_changes: list[CharacteristicChange] = field(default_factory=list)
+    service_changes: list[ServiceChangeTag] = field(default_factory=list)
     schema_version_changed: bool = False
-    old_schema_version: Optional[str] = None
-    new_schema_version: Optional[str] = None
+    old_schema_version: str | None = None
+    new_schema_version: str | None = None
     schema_revision_changed: bool = False
-    old_schema_revision: Optional[int] = None
-    new_schema_revision: Optional[int] = None
+    old_schema_revision: int | None = None
+    new_schema_revision: int | None = None
 
     def to_changelog_text(self) -> str:
         """Generate human-readable changelog.
@@ -111,10 +111,10 @@ class SchemaDiff:
                 lines.append(f"  Modified: {char_change.name}")
 
                 if char_change.description_changed:
-                    lines.append(f"      Description changed")
+                    lines.append("      Description changed")
 
                 if char_change.payload_config_changed:
-                    lines.append(f"      Payload config changed")
+                    lines.append("      Payload config changed")
 
                 if char_change.uuid_change:
                     old_uuid, new_uuid = char_change.uuid_change
@@ -142,11 +142,11 @@ class SchemaDiff:
                             lines.append(f"      ~ {field_change.name}")
 
                 if char_change.offsets_changed:
-                    lines.append(f"      Payload offsets changed")
+                    lines.append("      Payload offsets changed")
 
         return "\n".join(lines)
 
-    def get_characteristic_status(self, char_name: str) -> Optional[Literal['added', 'removed', 'modified']]:
+    def get_characteristic_status(self, char_name: str) -> Literal['added', 'removed', 'modified'] | None:
         """Get the change status for a specific characteristic.
 
         Args:
@@ -160,7 +160,7 @@ class SchemaDiff:
                 return change.change_type
         return None
 
-    def get_field_status(self, char_name: str, field_name: str) -> Optional[Literal['added', 'removed', 'modified']]:
+    def get_field_status(self, char_name: str, field_name: str) -> Literal['added', 'removed', 'modified'] | None:
         """Get the change status for a specific field.
 
         Args:
@@ -179,9 +179,9 @@ class SchemaDiff:
 
 
 def _compare_fields(
-    old_fields: List[Dict[str, Any]],
-    new_fields: List[Dict[str, Any]]
-) -> tuple[List[FieldChange], bool]:
+    old_fields: list[dict[str, Any]],
+    new_fields: list[dict[str, Any]]
+) -> tuple[list[FieldChange], bool]:
     """Compare two lists of fields and return changes.
 
     Args:
@@ -241,18 +241,18 @@ def _compare_fields(
     # Sort changes by offset (new offset for added/modified, old offset for removed)
     def get_sort_key(change: FieldChange) -> int:
         if change.change_type == 'added':
-            return new_by_name[change.name].get('offset', 0)
+            return int(new_by_name[change.name].get('offset') or 0)
         elif change.change_type == 'removed':
-            return old_by_name[change.name].get('offset', 0)
+            return int(old_by_name[change.name].get('offset') or 0)
         else:  # modified
-            return change.new_value.get('offset', 0) if isinstance(change.new_value, dict) else 0
+            return int(change.new_value.get('offset') or 0) if isinstance(change.new_value, dict) else 0
 
     changes.sort(key=get_sort_key)
 
     return changes, offsets_changed
 
 
-def _format_type_info(type_info: Dict[str, Any]) -> str:
+def _format_type_info(type_info: dict[str, Any]) -> str:
     """Format type_info dict into readable type string."""
     if not type_info:
         return "unknown"
@@ -262,7 +262,7 @@ def _format_type_info(type_info: Dict[str, Any]) -> str:
     is_array = type_info.get('is_array', False)
     array_size = type_info.get('array_size')
 
-    result = base
+    result: str = str(base)
     if type_info.get('size', 1) > 1 and endian == 'big':
         result += '_be'
 
@@ -275,7 +275,7 @@ def _format_type_info(type_info: Dict[str, Any]) -> str:
     return result
 
 
-def _compare_field_details(old_field: Dict[str, Any], new_field: Dict[str, Any]) -> str:
+def _compare_field_details(old_field: dict[str, Any], new_field: dict[str, Any]) -> str:
     """Compare field details and return human-readable difference description.
 
     Note: Offset changes are tracked separately, not included here.
@@ -326,10 +326,10 @@ def _compare_field_details(old_field: Dict[str, Any], new_field: Dict[str, Any])
 
 
 def _compare_payloads(
-    old_payload: Optional[Dict[str, Any]],
-    new_payload: Optional[Dict[str, Any]],
+    old_payload: dict[str, Any] | None,
+    new_payload: dict[str, Any] | None,
     payload_name: str
-) -> tuple[List[FieldChange], bool, bool]:
+) -> tuple[list[FieldChange], bool, bool]:
     """Compare two payloads and return field changes.
 
     Args:
@@ -379,8 +379,8 @@ def _compare_payloads(
 
 
 def _compare_characteristics(
-    old_char: Dict[str, Any],
-    new_char: Dict[str, Any]
+    old_char: dict[str, Any],
+    new_char: dict[str, Any]
 ) -> CharacteristicChange:
     """Compare two characteristics and return detailed changes.
 
@@ -394,12 +394,12 @@ def _compare_characteristics(
     field_changes = []
     description_changed = False
     payload_config_changed = False
-    uuid_change = None
+    uuid_change: tuple[str, str] | None = None
 
     old_uuid = old_char.get('uuid')
     new_uuid = new_char.get('uuid')
     if old_uuid != new_uuid:
-        uuid_change = (old_uuid, new_uuid)
+        uuid_change = (str(old_uuid), str(new_uuid))
 
     if old_char.get('description') != new_char.get('description'):
         description_changed = True
@@ -441,7 +441,7 @@ def _compare_characteristics(
     )
 
 
-def diff_schemas(old: Optional[Dict[str, Any]], new: Schema) -> SchemaDiff:
+def diff_schemas(old: dict[str, Any] | None, new: Schema) -> SchemaDiff:
     """Compare old snapshot to new schema, return structured diff.
 
     Args:
@@ -461,8 +461,8 @@ def diff_schemas(old: Optional[Dict[str, Any]], new: Schema) -> SchemaDiff:
             has_changes=False
         )
 
-    characteristic_changes = []
-    service_changes = []
+    characteristic_changes: list[CharacteristicChange] = []
+    service_changes: list[ServiceChangeTag] = []
     has_changes = False
 
     # Check schema version change
